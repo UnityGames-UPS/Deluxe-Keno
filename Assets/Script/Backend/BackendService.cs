@@ -6,7 +6,7 @@ using UnityEngine;
 /// <summary>
 /// Backend service interface
 /// </summary>
-/// test 
+/// test push
 public interface IBackendService
 {
     void Initialize(Action<GameInitData> onInitialized);
