@@ -1,6 +1,9 @@
 using System;
 using System.Collections.Generic;
 
+/// <summary>
+/// ENHANCED GameEvents with Game Exit event added
+/// </summary>
 public static class GameEvents
 {
     // Number Selection Events
@@ -20,6 +23,7 @@ public static class GameEvents
     public static event Action<GameResultData> OnGameResultReceived;
     public static event Action OnGameEnded;
     public static event Action OnRoundCompleted;
+    public static event Action OnGameExit;  // NEW: Game exit event
 
     // UI Events
     public static event Action<SpeedMode> OnSpeedModeChanged;
@@ -51,44 +55,53 @@ public static class GameEvents
     // Audio Events
     public static event Action OnAudioSettingsChanged;
 
-    // Trigger Methods
+    // Trigger Methods - Number Selection
     public static void TriggerNumberSelected(int number) => OnNumberSelected?.Invoke(number);
     public static void TriggerNumberDeselected(int number) => OnNumberDeselected?.Invoke(number);
     public static void TriggerAllNumbersCleared() => OnAllNumbersCleared?.Invoke();
     public static void TriggerQuickPickSelected(List<int> numbers) => OnQuickPickSelected?.Invoke(numbers);
 
+    // Trigger Methods - Betting
     public static void TriggerBetChanged(float bet) => OnBetChanged?.Invoke(bet);
     public static void TriggerAutoBetRoundsChanged(int rounds) => OnAutoBetRoundsChanged?.Invoke(rounds);
     public static void TriggerAutoPlayToggled(bool isEnabled) => OnAutoPlayToggled?.Invoke(isEnabled);
 
+    // Trigger Methods - Game Flow
     public static void TriggerPlayButtonClicked() => OnPlayButtonClicked?.Invoke();
     public static void TriggerGameStarted() => OnGameStarted?.Invoke();
     public static void TriggerGameResultReceived(GameResultData result) => OnGameResultReceived?.Invoke(result);
     public static void TriggerGameEnded() => OnGameEnded?.Invoke();
     public static void TriggerRoundCompleted() => OnRoundCompleted?.Invoke();
+    public static void TriggerGameExit() => OnGameExit?.Invoke();  // NEW: Game exit trigger
 
+    // Trigger Methods - UI
     public static void TriggerSpeedModeChanged(SpeedMode mode) => OnSpeedModeChanged?.Invoke(mode);
     public static void TriggerBalanceUpdated(float balance) => OnBalanceUpdated?.Invoke(balance);
     public static void TriggerWinAmountUpdated(float winAmount) => OnWinAmountUpdated?.Invoke(winAmount);
     public static void TriggerBetPopupToggled(bool show) => OnBetPopupToggled?.Invoke(show);
     public static void TriggerAutoBetPopupToggled(bool show) => OnAutoBetPopupToggled?.Invoke(show);
 
+    // Trigger Methods - Animation
     public static void TriggerBallDrawn(int ballNumber, bool isWinning) => OnBallDrawn?.Invoke(ballNumber, isWinning);
     public static void TriggerAnimationCompleted() => OnAnimationCompleted?.Invoke();
     public static void TriggerIntroAnimationStarted() => OnIntroAnimationStarted?.Invoke();
     public static void TriggerIntroAnimationCompleted() => OnIntroAnimationCompleted?.Invoke();
 
+    // Trigger Methods - Paytable
     public static void TriggerPaytableUpdate(int selectedCount) => OnPaytableUpdate?.Invoke(selectedCount);
     public static void TriggerPaytableHighlight() => OnPaytableHighlight?.Invoke();
 
+    // Trigger Methods - Win
     public static void TriggerShowWinPopup(float winAmount) => OnShowWinPopup?.Invoke(winAmount);
 
+    // Trigger Methods - Connection
     public static void TriggerConnectionLost() => OnConnectionLost?.Invoke();
     public static void TriggerConnectionRestored() => OnConnectionRestored?.Invoke();
     public static void TriggerConnectionUnstable() => OnConnectionUnstable?.Invoke();
     public static void TriggerConnectionError(string message) => OnConnectionError?.Invoke(message);
     public static void TriggerAnotherDeviceLogin() => OnAnotherDeviceLogin?.Invoke();
 
+    // Trigger Methods - Audio
     public static void TriggerAudioSettingsChanged() => OnAudioSettingsChanged?.Invoke();
 }
 

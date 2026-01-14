@@ -6,8 +6,10 @@ using Best.SocketIO;
 using Best.SocketIO.Events;
 
 /// <summary>
-/// FIXED: Proper WebGL auth token handling with timeout
-/// Now waits for JSBridge to receive token before connecting
+/// ENHANCED SocketBackendService with:
+/// - IsQuitSelf check to prevent reconnection after user quit
+/// - Connection state management matching reference game
+/// - Proper ping/pong handling for unstable/restored states
 /// </summary>
 public class SocketBackendService : IBackendService
 {
@@ -16,7 +18,7 @@ public class SocketBackendService : IBackendService
     private const int MAX_MISSED_PONGS = 5;
     private const int MAX_RECONNECT_ATTEMPTS = 5;
     private const float RECONNECT_DELAY = 2f;
-    private const float AUTH_TOKEN_TIMEOUT = 10f; // Timeout for waiting for auth token
+    private const float AUTH_TOKEN_TIMEOUT = 10f;
 
     private readonly string _serverURL;
     private readonly string _namespace;
@@ -55,10 +57,8 @@ public class SocketBackendService : IBackendService
         _onInitialized = onInitialized;
 
 #if UNITY_WEBGL && !UNITY_EDITOR
-        // FIXED: Start coroutine that waits for auth token with timeout
         CoroutineRunner.Instance.StartCoroutine(InitializeWithWebGLAuth());
 #else
-        // Editor mode - use test token immediately
         InitializeWithToken(_editorTestToken);
 #endif
     }
@@ -113,16 +113,13 @@ public class SocketBackendService : IBackendService
         GameLogger.LogConnection("Socket connection closed");
     }
 
-    // FIXED: Proper WebGL auth token waiting with timeout
     private IEnumerator InitializeWithWebGLAuth()
     {
-        // Request auth token from platform
         JSBridge.RequestAuthToken();
         GameLogger.LogConnection("Requesting auth token from JavaScript");
 
         float elapsed = 0f;
 
-        // Wait for auth token with timeout
         while (!JSBridge.HasAuthToken && elapsed < AUTH_TOKEN_TIMEOUT)
         {
             yield return null;
@@ -136,7 +133,6 @@ public class SocketBackendService : IBackendService
             yield break;
         }
 
-        // Verify we have all required data
         if (string.IsNullOrEmpty(JSBridge.AuthToken) || string.IsNullOrEmpty(JSBridge.SocketURL))
         {
             GameLogger.LogConnectionError("Invalid auth token or socket URL received");
@@ -148,14 +144,11 @@ public class SocketBackendService : IBackendService
         GameLogger.LogConnection($"Socket URL: {JSBridge.SocketURL}");
         GameLogger.LogConnection($"Namespace: {JSBridge.Namespace}");
 
-        // Now connect with the received token and URL
         InitializeWithToken(JSBridge.AuthToken, JSBridge.SocketURL, JSBridge.Namespace);
     }
 
-    // FIXED: Support dynamic URL and namespace from platform
     private void InitializeWithToken(string token, string socketURL = null, string nameSpace = null)
     {
-        // Use provided URL or fallback to configured one
         string finalURL = !string.IsNullOrEmpty(socketURL) ? socketURL : _serverURL;
         string finalNamespace = !string.IsNullOrEmpty(nameSpace) ? nameSpace : _namespace;
 
@@ -170,7 +163,6 @@ public class SocketBackendService : IBackendService
 
         _manager = new SocketManager(new Uri(finalURL), options);
 
-        // Use namespace if provided
         _socket = string.IsNullOrEmpty(finalNamespace)
             ? _manager.Socket
             : _manager.GetSocket($"/{finalNamespace}");
@@ -202,25 +194,53 @@ public class SocketBackendService : IBackendService
         _isConnected = true;
         _reconnectAttempts = 0;
 
+        // MATCHING REFERENCE GAME: Close popups if reconnected
         if (_hasEverConnected)
+        {
+            // Get UIController to close popups
+            UIController uiManager = UnityEngine.Object.FindObjectOfType<UIController>();
+            if (uiManager != null)
+            {
+                uiManager.CheckAndClosePopups();
+            }
+
             GameEvents.TriggerConnectionRestored();
+        }
 
         _hasEverConnected = true;
         ResetHeartbeat();
         StartHeartbeat();
 
-        // Notify platform we entered the game
         JSBridge.NotifyGameEntered();
     }
 
+    /// <summary>
+    /// CRITICAL: OnDisconnected with IsQuitSelf check
+    /// MATCHING REFERENCE GAME LOGIC
+    /// </summary>
     private void OnDisconnected()
     {
         GameLogger.LogConnectionWarning("Disconnected from server");
+        GameLogger.Log("On Disconnected Called");
 
         _isConnected = false;
+
+        // CRITICAL: Check if user is quitting to prevent showing disconnect popup
+        UIController uiManager = UnityEngine.Object.FindObjectOfType<UIController>();
+        bool isUserQuitting = (uiManager != null && uiManager.IsQuitSelf);
+
+        if (!isUserQuitting)
+        {
+            // Only show disconnect popup if NOT user-initiated
+            uiManager?.DisconnectionPopup();
+            AttemptReconnection();
+        }
+        else
+        {
+            GameLogger.LogConnection("User-initiated disconnect (IsQuitSelf=true) - skipping reconnection");
+        }
+
         StopHeartbeat();
-        GameEvents.TriggerConnectionLost();
-        AttemptReconnection();
     }
 
     private void OnError(Error error)
@@ -228,8 +248,9 @@ public class SocketBackendService : IBackendService
         GameLogger.LogConnectionError($"Socket Error: {error}");
         GameEvents.TriggerConnectionError($"Connection error: {error}");
 
-        // Notify platform of error
-        JSBridge.NotifyError();
+#if UNITY_WEBGL && !UNITY_EDITOR
+        JSBridge.SendMessage("error");
+#endif
     }
 
     private void OnGameInit(string data)
@@ -269,16 +290,22 @@ public class SocketBackendService : IBackendService
         }
     }
 
+    /// <summary>
+    /// MATCHING REFERENCE GAME: Pong received handler
+    /// </summary>
     private void OnPongReceived(string data)
     {
-        GameLogger.LogConnection($"Pong received - Latency: {(Time.time - _lastPongTime) * 1000:F0}ms");
+        // GameLogger.LogConnection($"Pong received - Latency: {(Time.time - _lastPongTime) * 1000:F0}ms");
 
         _waitingForPong = false;
         _missedPongs = 0;
         _lastPongTime = Time.time;
 
+        // If we had unstable connection, notify it's restored
         if (_hasEverConnected)
+        {
             GameEvents.TriggerConnectionRestored();
+        }
     }
 
     private void OnInternalError(string data)
@@ -295,6 +322,7 @@ public class SocketBackendService : IBackendService
     private void OnAnotherDevice(string data)
     {
         GameLogger.LogConnectionError("Account logged in from another device");
+        // Note: Reference game doesn't show popup, just logs
         GameEvents.TriggerAnotherDeviceLogin();
         Close();
     }
@@ -321,35 +349,57 @@ public class SocketBackendService : IBackendService
         _lastPongTime = Time.time;
     }
 
+    /// <summary>
+    /// MATCHING REFERENCE GAME: Heartbeat with unstable/restored state management
+    /// - After 0 missed pongs: Check and close popups (connection stable)
+    /// - After 2 missed pongs: Show reconnecting popup (unstable)
+    /// - After 5 missed pongs: Show disconnect popup (lost)
+    /// </summary>
     private IEnumerator HeartbeatLoop()
     {
         while (true)
         {
+            // GameLogger.Log($"PingCheck | waitingForPong: {_waitingForPong}, missedPongs: {_missedPongs}");
+
+            // MATCHING REFERENCE GAME: Check and close popups when connection is stable
+            if (_missedPongs == 0)
+            {
+                UIController uiManager = UnityEngine.Object.FindObjectOfType<UIController>();
+                uiManager?.CheckAndClosePopups();
+            }
+
             if (_waitingForPong)
             {
-                _missedPongs++;
-
+                // MATCHING REFERENCE GAME: After 2 missed pongs, show reconnecting popup
                 if (_missedPongs == 2)
                 {
-                    GameLogger.LogConnectionWarning("Connection unstable - missed pongs");
+                    UIController uiManager = UnityEngine.Object.FindObjectOfType<UIController>();
+                    uiManager?.ReconnectionPopup();
                     GameEvents.TriggerConnectionUnstable();
                 }
 
+                _missedPongs++;
+                GameLogger.LogConnectionWarning($"Pong missed #{_missedPongs}/{MAX_MISSED_PONGS}");
+
+                // After 5 missed pongs - connection lost
                 if (_missedPongs >= MAX_MISSED_PONGS)
                 {
-                    GameLogger.LogConnectionError($"Max missed pongs ({MAX_MISSED_PONGS}) - connection lost");
+                    GameLogger.LogConnectionError($"Unable to connect to server — {MAX_MISSED_PONGS} consecutive pongs missed.");
                     _isConnected = false;
+
+                    UIController uiManager = UnityEngine.Object.FindObjectOfType<UIController>();
+                    uiManager?.DisconnectionPopup();
+
                     GameEvents.TriggerConnectionLost();
                     yield break;
                 }
-
-                GameLogger.LogConnectionWarning($"Missed pong #{_missedPongs}/{MAX_MISSED_PONGS}");
             }
 
+            // Send next ping
             _waitingForPong = true;
             _lastPongTime = Time.time;
 
-            GameLogger.LogServerSend("ping");
+            // GameLogger.LogServerSend("ping");
             EmitEvent("ping");
 
             yield return new WaitForSeconds(PING_INTERVAL);
@@ -378,8 +428,18 @@ public class SocketBackendService : IBackendService
 
         yield return new WaitForSeconds(delay);
 
-        if (_manager != null && !_isConnected)
+        // CRITICAL: Check again if user is quitting before reconnecting
+        UIController uiManager = UnityEngine.Object.FindObjectOfType<UIController>();
+        bool isUserQuitting = (uiManager != null && uiManager.IsQuitSelf);
+
+        if (_manager != null && !_isConnected && !isUserQuitting)
+        {
             _manager.Open();
+        }
+        else if (isUserQuitting)
+        {
+            GameLogger.LogConnection("User quit during reconnection delay - aborting reconnection");
+        }
     }
 
     private void EmitEvent(string eventName, string json = null)

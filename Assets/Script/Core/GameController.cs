@@ -1,6 +1,12 @@
 using System.Collections;
 using UnityEngine;
 
+/// <summary>
+/// ENHANCED GameController with:
+/// - CloseSocket() method accessible to platform (via SendMessage)
+/// - Raycast blocker during initialization
+/// - Proper game exit handling matching reference game
+/// </summary>
 public class GameController : MonoBehaviour
 {
     #region Singleton
@@ -23,6 +29,9 @@ public class GameController : MonoBehaviour
     [SerializeField] private string _namespace = "playground";
     [SerializeField] private string _gameID = "KN-test";
     [SerializeField] private string _editorTestToken = "your_test_token_here";
+
+    [Header("UI Elements")]
+    [SerializeField] private GameObject _raycastBlocker;  // NEW: Blocks input during initialization
     #endregion
 
     #region Dependencies
@@ -34,6 +43,7 @@ public class GameController : MonoBehaviour
 
     #region Public Accessors
     public GameModel GetModel() => _model;
+    public bool IsInitialized => _isInitialized;
     #endregion
 
     #region Unity Lifecycle
@@ -67,6 +77,14 @@ public class GameController : MonoBehaviour
             : new SocketBackendService(_serverURL, _namespace, _gameID, _editorTestToken);
 
         SubscribeToEvents();
+
+        // Enable raycast blocker during initialization
+        if (_raycastBlocker != null)
+        {
+            _raycastBlocker.SetActive(true);
+            GameLogger.Log("Raycast blocker enabled - preventing user input during initialization");
+        }
+
         _backendService.Initialize(OnGameInitialized);
     }
 
@@ -79,7 +97,17 @@ public class GameController : MonoBehaviour
         GameEvents.TriggerBetChanged(_model.PlayerData.currentBet);
         GameEvents.TriggerWinAmountUpdated(0f);
 
+        // Disable raycast blocker - game is ready for interaction
+        if (_raycastBlocker != null)
+        {
+            _raycastBlocker.SetActive(false);
+            GameLogger.Log("Raycast blocker disabled - game ready for interaction");
+        }
+
+        // Notify platform game entered
         JSBridge.NotifyGameEntered();
+
+        GameLogger.LogConnection("Game initialization complete");
     }
     #endregion
 
@@ -101,8 +129,11 @@ public class GameController : MonoBehaviour
 
         GameEvents.OnConnectionLost += HandleConnectionLost;
         GameEvents.OnConnectionRestored += HandleConnectionRestored;
+        GameEvents.OnConnectionUnstable += HandleConnectionUnstable;
         GameEvents.OnConnectionError += HandleConnectionError;
         GameEvents.OnAnotherDeviceLogin += HandleAnotherDeviceLogin;
+
+        GameEvents.OnGameExit += HandleGameExit;
     }
 
     private void UnsubscribeFromEvents()
@@ -122,8 +153,130 @@ public class GameController : MonoBehaviour
 
         GameEvents.OnConnectionLost -= HandleConnectionLost;
         GameEvents.OnConnectionRestored -= HandleConnectionRestored;
+        GameEvents.OnConnectionUnstable -= HandleConnectionUnstable;
         GameEvents.OnConnectionError -= HandleConnectionError;
         GameEvents.OnAnotherDeviceLogin -= HandleAnotherDeviceLogin;
+
+        GameEvents.OnGameExit -= HandleGameExit;
+    }
+    #endregion
+
+    #region Platform-Accessible Methods (Called via SendMessage from JavaScript)
+
+    /// <summary>
+    /// CRITICAL: This method is called from JavaScript via Unity's SendMessage
+    /// Name MUST match exactly: "CloseSocket"
+    /// This allows the platform (React Native WebView) to trigger game exit
+    /// 
+    /// Usage from JavaScript:
+    /// SendMessage('GameController', 'CloseSocket', '');
+    /// </summary>
+    public void CloseSocket()
+    {
+        GameLogger.LogConnection("CloseSocket called from platform");
+        StartCoroutine(CloseSocketCoroutine());
+    }
+
+    private IEnumerator CloseSocketCoroutine()
+    {
+        // Enable raycast blocker to prevent interaction during exit
+        if (_raycastBlocker != null)
+        {
+            _raycastBlocker.SetActive(true);
+            GameLogger.Log("Raycast blocker enabled - preventing interaction during exit");
+        }
+
+        // Stop auto-play if active
+        if (_model != null && _model.PlayerData.isAutoPlayActive)
+        {
+            GameEvents.TriggerAutoPlayToggled(false);
+        }
+
+        GameLogger.Log("Closing Socket");
+
+        // Close backend service
+        if (_backendService != null)
+        {
+            _backendService.Close();
+        }
+
+        GameLogger.Log("Waiting for socket to close");
+        yield return new WaitForSeconds(0.5f);
+
+        GameLogger.Log("Socket Closed");
+
+        // Notify platform that exit is complete
+#if UNITY_WEBGL && !UNITY_EDITOR
+        JSBridge.SendMessage("OnExit"); // Telling the React platform user wants to quit and go back to homepage
+#endif
+
+        GameLogger.LogConnection("Game exit complete - OnExit message sent to platform");
+    }
+
+    #endregion
+
+    #region Connection Handlers
+    private void HandleConnectionLost()
+    {
+        GameLogger.LogConnectionError("Connection lost");
+
+        // Stop auto-play if active
+        if (_model.PlayerData.isAutoPlayActive)
+        {
+            GameEvents.TriggerAutoPlayToggled(false);
+            GameLogger.Log("Auto-play stopped due to connection loss");
+        }
+
+        // UI will show disconnect popup via UIController
+    }
+
+    private void HandleConnectionRestored()
+    {
+        GameLogger.LogConnection("Connection restored successfully");
+        // UI will automatically close popups via UIController
+    }
+
+    private void HandleConnectionUnstable()
+    {
+        GameLogger.LogConnectionWarning("Connection unstable - reconnecting");
+
+        // Stop auto-play if active (safety measure)
+        if (_model.PlayerData.isAutoPlayActive)
+        {
+            GameEvents.TriggerAutoPlayToggled(false);
+            GameLogger.Log("Auto-play paused due to unstable connection");
+        }
+    }
+
+    private void HandleConnectionError(string message)
+    {
+        GameLogger.LogConnectionError($"Connection error: {message}");
+        ErrorPopupManager.ShowError($"Connection error: {message}");
+    }
+
+    private void HandleAnotherDeviceLogin()
+    {
+        GameLogger.LogConnectionError("Account logged in from another device");
+        ErrorPopupManager.ShowError("Your account has been logged in from another device");
+
+        // Trigger exit
+        StartCoroutine(ExitAfterDelay(2f));
+    }
+    #endregion
+
+    #region Game Exit Handling
+    private void HandleGameExit()
+    {
+        GameLogger.LogConnection("Game exit requested (user initiated)");
+
+        // Call the same CloseSocket method that platform uses
+        CloseSocket();
+    }
+
+    private IEnumerator ExitAfterDelay(float delay)
+    {
+        yield return new WaitForSeconds(delay);
+        CloseSocket();
     }
     #endregion
 
@@ -256,31 +409,6 @@ public class GameController : MonoBehaviour
     }
     #endregion
 
-    #region Connection Handlers
-    private void HandleConnectionLost()
-    {
-        if (_model.PlayerData.isAutoPlayActive)
-            GameEvents.TriggerAutoPlayToggled(false);
-
-        ErrorPopupManager.ShowError(ErrorMessages.CONNECTION_LOST);
-    }
-
-    private void HandleConnectionRestored()
-    {
-    }
-
-    private void HandleConnectionError(string message)
-    {
-        ErrorPopupManager.ShowError($"Connection error: {message}");
-    }
-
-    private void HandleAnotherDeviceLogin()
-    {
-        ErrorPopupManager.ShowError("Your account has been logged in from another device");
-        StartCoroutine(ExitAfterDelay(2f));
-    }
-    #endregion
-
     #region Game Flow
     private void StartGame()
     {
@@ -351,13 +479,13 @@ public class GameController : MonoBehaviour
             _autoPlayCoroutine = null;
         }
 
-        _backendService?.Close();
-    }
+        if (_backendService != null)
+        {
+            _backendService.Close();
+            GameLogger.LogConnection("Backend service cleaned up");
+        }
 
-    private IEnumerator ExitAfterDelay(float delay)
-    {
-        yield return new WaitForSeconds(delay);
-        JSBridge.NotifyGameExit();
+        GameLogger.Log("GameController cleanup complete");
     }
     #endregion
 }
