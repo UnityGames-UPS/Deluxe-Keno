@@ -5,6 +5,10 @@ using UnityEngine;
 using Best.SocketIO;
 using Best.SocketIO.Events;
 
+/// <summary>
+/// FIXED: Proper WebGL auth token handling with timeout
+/// Now waits for JSBridge to receive token before connecting
+/// </summary>
 public class SocketBackendService : IBackendService
 {
     private const float PING_INTERVAL = 2f;
@@ -12,6 +16,7 @@ public class SocketBackendService : IBackendService
     private const int MAX_MISSED_PONGS = 5;
     private const int MAX_RECONNECT_ATTEMPTS = 5;
     private const float RECONNECT_DELAY = 2f;
+    private const float AUTH_TOKEN_TIMEOUT = 10f; // Timeout for waiting for auth token
 
     private readonly string _serverURL;
     private readonly string _namespace;
@@ -50,8 +55,10 @@ public class SocketBackendService : IBackendService
         _onInitialized = onInitialized;
 
 #if UNITY_WEBGL && !UNITY_EDITOR
+        // FIXED: Start coroutine that waits for auth token with timeout
         CoroutineRunner.Instance.StartCoroutine(InitializeWithWebGLAuth());
 #else
+        // Editor mode - use test token immediately
         InitializeWithToken(_editorTestToken);
 #endif
     }
@@ -106,15 +113,17 @@ public class SocketBackendService : IBackendService
         GameLogger.LogConnection("Socket connection closed");
     }
 
+    // FIXED: Proper WebGL auth token waiting with timeout
     private IEnumerator InitializeWithWebGLAuth()
     {
+        // Request auth token from platform
         JSBridge.RequestAuthToken();
         GameLogger.LogConnection("Requesting auth token from JavaScript");
 
-        float timeout = 10f;
         float elapsed = 0f;
 
-        while (!JSBridge.HasAuthToken && elapsed < timeout)
+        // Wait for auth token with timeout
+        while (!JSBridge.HasAuthToken && elapsed < AUTH_TOKEN_TIMEOUT)
         {
             yield return null;
             elapsed += Time.deltaTime;
@@ -122,17 +131,34 @@ public class SocketBackendService : IBackendService
 
         if (!JSBridge.HasAuthToken)
         {
-            GameLogger.LogConnectionError("Failed to receive auth token from JavaScript");
-            GameEvents.TriggerConnectionError("Authentication failed");
+            GameLogger.LogConnectionError("Failed to receive auth token from JavaScript - timeout");
+            GameEvents.TriggerConnectionError("Authentication failed - timeout");
             yield break;
         }
 
-        GameLogger.LogConnection("Auth token received successfully");
-        InitializeWithToken(JSBridge.AuthToken);
+        // Verify we have all required data
+        if (string.IsNullOrEmpty(JSBridge.AuthToken) || string.IsNullOrEmpty(JSBridge.SocketURL))
+        {
+            GameLogger.LogConnectionError("Invalid auth token or socket URL received");
+            GameEvents.TriggerConnectionError("Authentication failed - invalid data");
+            yield break;
+        }
+
+        GameLogger.LogConnection($"Auth token received successfully after {elapsed:F2}s");
+        GameLogger.LogConnection($"Socket URL: {JSBridge.SocketURL}");
+        GameLogger.LogConnection($"Namespace: {JSBridge.Namespace}");
+
+        // Now connect with the received token and URL
+        InitializeWithToken(JSBridge.AuthToken, JSBridge.SocketURL, JSBridge.Namespace);
     }
 
-    private void InitializeWithToken(string token)
+    // FIXED: Support dynamic URL and namespace from platform
+    private void InitializeWithToken(string token, string socketURL = null, string nameSpace = null)
     {
+        // Use provided URL or fallback to configured one
+        string finalURL = !string.IsNullOrEmpty(socketURL) ? socketURL : _serverURL;
+        string finalNamespace = !string.IsNullOrEmpty(nameSpace) ? nameSpace : _namespace;
+
         SocketOptions options = new SocketOptions
         {
             AutoConnect = false,
@@ -142,13 +168,17 @@ public class SocketBackendService : IBackendService
             Auth = (manager, socket) => new { token = token }
         };
 
-        _manager = new SocketManager(new Uri(_serverURL), options);
-        _socket = string.IsNullOrEmpty(_namespace) ? _manager.Socket : _manager.GetSocket($"/{_namespace}");
+        _manager = new SocketManager(new Uri(finalURL), options);
+
+        // Use namespace if provided
+        _socket = string.IsNullOrEmpty(finalNamespace)
+            ? _manager.Socket
+            : _manager.GetSocket($"/{finalNamespace}");
 
         SetupEventListeners();
         _manager.Open();
 
-        GameLogger.LogConnection($"Connecting to {_serverURL} with namespace: {_namespace}");
+        GameLogger.LogConnection($"Connecting to {finalURL} with namespace: {finalNamespace}");
     }
 
     private void SetupEventListeners()
@@ -178,6 +208,9 @@ public class SocketBackendService : IBackendService
         _hasEverConnected = true;
         ResetHeartbeat();
         StartHeartbeat();
+
+        // Notify platform we entered the game
+        JSBridge.NotifyGameEntered();
     }
 
     private void OnDisconnected()
@@ -194,6 +227,9 @@ public class SocketBackendService : IBackendService
     {
         GameLogger.LogConnectionError($"Socket Error: {error}");
         GameEvents.TriggerConnectionError($"Connection error: {error}");
+
+        // Notify platform of error
+        JSBridge.NotifyError();
     }
 
     private void OnGameInit(string data)

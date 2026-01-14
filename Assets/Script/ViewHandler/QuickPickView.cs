@@ -162,7 +162,7 @@ public class QuickPickView : MonoBehaviour
 
         List<int> randomNumbers = GenerateRandomNumbers(randomCount);
         GameEvents.TriggerQuickPickSelected(randomNumbers);
-        UpdateButtonColors(randomCount);
+       // UpdateButtonColors(randomCount);
         AnimateButton(_shuffleButton);
         AudioManager.Instance.PlayButtonClick();
     }
