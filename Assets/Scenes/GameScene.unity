@@ -17760,7 +17760,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 7ce769c391093a1478c6b0cfacf16a61, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  _useDummyBackend: 0
+  _useDummyBackend: 1
   _serverURL: https://devrealtime.dingdinghouse.com/
   _namespace: playground
   _gameID: KN-KND
@@ -38870,7 +38870,7 @@ GameObject:
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
-  m_IsActive: 0
+  m_IsActive: 1
 --- !u!224 &1611225880
 RectTransform:
   m_ObjectHideFlags: 0
@@ -39047,10 +39047,10 @@ MonoBehaviour:
   _endPoint: {fileID: 1358943995}
   _verticalFallDuration: 0.4
   _horizontalRollDuration: 0.5
-  _bounceDuration: 0.15
-  _ballRadius: 12
+  _bounceDuration: 0.2
+  _ballRadius: 33
   _ballSpacing: 0.1
-  _bounceAmount: 1.5
+  _bounceAmount: 2
   _normalDelay: 0.35
   _turboDelay: 0.15
   _turboMultiplier: 1.2

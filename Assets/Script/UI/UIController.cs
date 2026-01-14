@@ -5,6 +5,11 @@ using DG.Tweening;
 using System.Collections;
 using System.Text;
 
+/// <summary>
+/// FIXED:
+/// - Play button stays visible but becomes non-interactable during play
+/// - Only in autoplay mode does it get disabled and pause button shows
+/// </summary>
 public class UIController : MonoBehaviour
 {
     [Header("Main Buttons")]
@@ -81,9 +86,9 @@ public class UIController : MonoBehaviour
     private StringBuilder _stringBuilder = new StringBuilder(32);
 
     // OPTIMIZATION: Cached format strings
-    private const string BALANCE_FORMAT = "${0:F2}";
-    private const string BET_FORMAT = "${0:F2}";
-    private const string WIN_FORMAT = "${0:F2}";
+    private const string BALANCE_FORMAT = "{0:F2}";
+    private const string BET_FORMAT = "{0:F2}";
+    private const string WIN_FORMAT = "{0:F2}";
 
     private void Start()
     {
@@ -148,7 +153,7 @@ public class UIController : MonoBehaviour
             _betAmountText.text = _loadingText;
 
         if (_winAmountText != null)
-            _winAmountText.text = "$0.00";
+            _winAmountText.text = "0.00";
     }
 
     private void InitializeUI()
@@ -159,6 +164,7 @@ public class UIController : MonoBehaviour
         _autoBetPopupMainPanel?.SetActive(false);
         _winPopupMainPanel?.SetActive(false);
 
+        // FIXED: Play button always visible and interactable at start
         if (_playButton != null)
         {
             _playButton.gameObject.SetActive(true);
@@ -235,7 +241,7 @@ public class UIController : MonoBehaviour
         GameEvents.OnGameEnded += HandleGameEnded;
         GameEvents.OnAutoPlayToggled += HandleAutoPlayToggled;
         GameEvents.OnShowWinPopup += ShowWinPopup;
-        GameEvents.OnSpeedModeChanged += HandleSpeedModeChanged; // ADDED: Listen to speed changes
+        GameEvents.OnSpeedModeChanged += HandleSpeedModeChanged;
     }
 
     private void UnsubscribeFromEvents()
@@ -247,7 +253,7 @@ public class UIController : MonoBehaviour
         GameEvents.OnGameEnded -= HandleGameEnded;
         GameEvents.OnAutoPlayToggled -= HandleAutoPlayToggled;
         GameEvents.OnShowWinPopup -= ShowWinPopup;
-        GameEvents.OnSpeedModeChanged -= HandleSpeedModeChanged; // ADDED: Unsubscribe
+        GameEvents.OnSpeedModeChanged -= HandleSpeedModeChanged;
     }
 
     #region Display Updates - OPTIMIZED
@@ -256,7 +262,6 @@ public class UIController : MonoBehaviour
         if (_balanceText != null)
         {
             _stringBuilder.Clear();
-            _stringBuilder.Append('$');
             _stringBuilder.Append(balance.ToString("F2"));
             _balanceText.text = _stringBuilder.ToString();
         }
@@ -267,7 +272,6 @@ public class UIController : MonoBehaviour
         if (_betAmountText != null)
         {
             _stringBuilder.Clear();
-            _stringBuilder.Append('$');
             _stringBuilder.Append(bet.ToString("F2"));
             _betAmountText.text = _stringBuilder.ToString();
         }
@@ -279,7 +283,6 @@ public class UIController : MonoBehaviour
         if (_winAmountText != null)
         {
             _stringBuilder.Clear();
-            _stringBuilder.Append('$');
             _stringBuilder.Append(winAmount.ToString("F2"));
             _winAmountText.text = _stringBuilder.ToString();
 
@@ -349,7 +352,6 @@ public class UIController : MonoBehaviour
         GameEvents.TriggerSpeedModeChanged(mode);
     }
 
-    // ADDED: Handle external speed mode changes (from MainMenu Settings)
     private void HandleSpeedModeChanged(SpeedMode mode)
     {
         _currentSpeedMode = mode;
@@ -377,11 +379,28 @@ public class UIController : MonoBehaviour
     #region Event Handlers
     private void HandleGameStarted()
     {
-        if (_playButton != null)
-            _playButton.gameObject.SetActive(false);
+        // FIXED: Different behavior for autoplay vs normal play
+        if (_isAutoPlayMode)
+        {
+            // AUTOPLAY MODE: Hide play button, show pause button
+            if (_playButton != null)
+                _playButton.gameObject.SetActive(false);
 
-        if (_pauseButton != null)
-            _pauseButton.gameObject.SetActive(_isAutoPlayMode);
+            if (_pauseButton != null)
+                _pauseButton.gameObject.SetActive(true);
+        }
+        else
+        {
+            // NORMAL PLAY MODE: Keep play button visible but make it non-interactable
+            if (_playButton != null)
+            {
+                _playButton.gameObject.SetActive(true);
+                _playButton.interactable = false;
+            }
+
+            if (_pauseButton != null)
+                _pauseButton.gameObject.SetActive(false);
+        }
 
         _mainControlContainer?.SetActive(false);
         _speedControlContainer?.SetActive(true);
@@ -394,8 +413,12 @@ public class UIController : MonoBehaviour
     {
         if (!_isAutoPlayMode)
         {
+            // NORMAL PLAY MODE: Re-enable play button
             if (_playButton != null)
+            {
                 _playButton.gameObject.SetActive(true);
+                _playButton.interactable = true;
+            }
 
             if (_pauseButton != null)
                 _pauseButton.gameObject.SetActive(false);
@@ -425,8 +448,12 @@ public class UIController : MonoBehaviour
 
         if (!isActive)
         {
+            // When autoplay stops, restore normal state
             if (_playButton != null)
+            {
                 _playButton.gameObject.SetActive(true);
+                _playButton.interactable = true;
+            }
 
             if (_pauseButton != null)
                 _pauseButton.gameObject.SetActive(false);
@@ -489,7 +516,6 @@ public class UIController : MonoBehaviour
         if (_winPopupAmountText != null)
         {
             _stringBuilder.Clear();
-            _stringBuilder.Append('$');
             _stringBuilder.Append(winAmount.ToString("F2"));
             _winPopupAmountText.text = _stringBuilder.ToString();
         }
@@ -619,7 +645,6 @@ public class UIController : MonoBehaviour
                 if (btnText != null)
                 {
                     _stringBuilder.Clear();
-                    _stringBuilder.Append('$');
                     _stringBuilder.Append(bets[i].ToString("F2"));
                     btnText.text = _stringBuilder.ToString();
                     btnText.color = Mathf.Approximately(bets[i], _selectedBet) ? _betSelectedColor : _betNormalColor;
@@ -756,7 +781,6 @@ public class UIController : MonoBehaviour
         punchTween.OnComplete(() => punchTween.Kill());
     }
 
-    // UPDATED: Now includes text color changes
     private void UpdateSpeedButtonStates()
     {
         // Normal
@@ -775,7 +799,6 @@ public class UIController : MonoBehaviour
         UpdateSpeedButtonTextColor(_instantSpeedButton, _currentSpeedMode == SpeedMode.Instant);
     }
 
-    // ADDED: Helper method to update speed button text colors
     private void UpdateSpeedButtonTextColor(Button button, bool isSelected)
     {
         if (button == null) return;
