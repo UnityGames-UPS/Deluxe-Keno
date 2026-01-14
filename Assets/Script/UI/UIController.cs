@@ -138,7 +138,6 @@ public class UIController : MonoBehaviour
         InitializeUI();
         SubscribeToEvents();
         SetupButtonListeners();
-        StartCoroutine(WaitForGameControllerAndInitialize());
 
         // Start background music
         AudioManager.Instance.PlayBackgroundMusic();
@@ -153,7 +152,7 @@ public class UIController : MonoBehaviour
     #endregion
 
     #region Initialization
-    private IEnumerator WaitForGameControllerAndInitialize()
+    internal IEnumerator WaitForGameControllerAndInitialize()
     {
         SetLoadingState();
 

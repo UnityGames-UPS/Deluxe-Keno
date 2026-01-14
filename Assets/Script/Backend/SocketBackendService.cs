@@ -18,7 +18,7 @@ public class SocketBackendService : IBackendService
     private const int MAX_MISSED_PONGS = 5;
     private const int MAX_RECONNECT_ATTEMPTS = 5;
     private const float RECONNECT_DELAY = 2f;
-    private const float AUTH_TOKEN_TIMEOUT = 10f;
+    private const float AUTH_TOKEN_TIMEOUT = 20f;
 
     private readonly string _serverURL;
     private readonly string _namespace;
@@ -384,7 +384,7 @@ public class SocketBackendService : IBackendService
                 // After 5 missed pongs - connection lost
                 if (_missedPongs >= MAX_MISSED_PONGS)
                 {
-                    GameLogger.LogConnectionError($"Unable to connect to server — {MAX_MISSED_PONGS} consecutive pongs missed.");
+                    GameLogger.LogConnectionError($"Unable to connect to server ï¿½ {MAX_MISSED_PONGS} consecutive pongs missed.");
                     _isConnected = false;
 
                     UIController uiManager = UnityEngine.Object.FindObjectOfType<UIController>();
