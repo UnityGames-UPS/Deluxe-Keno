@@ -5,6 +5,7 @@ using System.Collections.Generic;
 /// Optimized Audio Manager with pooling and volume control
 /// Supports separate controls for SFX and Background Music
 /// FIXED: Proper cleanup to prevent MissingReferenceException
+/// NEW: Added scroll sound effects (button click and drag)
 /// </summary>
 public class AudioManager : MonoBehaviour
 {
@@ -37,6 +38,10 @@ public class AudioManager : MonoBehaviour
     [SerializeField] private AudioClip _playButtonSound;
     [SerializeField] private AudioClip _winBallSound;
     [SerializeField] private AudioClip _winPopupSound;
+
+    [Header("Scroll Sounds")]
+    [SerializeField] private AudioClip _scrollButtonSound;  // NEW: Plays once when using left/right buttons
+    [SerializeField] private AudioClip _scrollDragSound;    // NEW: Plays continuously while dragging
 
     [Header("Background Music")]
     [SerializeField] private AudioClip _mainBGMusic;
@@ -183,6 +188,10 @@ public class AudioManager : MonoBehaviour
     public void PlayPlayButton() => PlaySFX(_playButtonSound);
     public void PlayWinBall() => PlaySFX(_winBallSound);
     public void PlayWinPopup() => PlaySFX(_winPopupSound);
+
+    // NEW: Scroll sound methods
+    public void PlayScrollButton() => PlaySFX(_scrollButtonSound);
+    public void PlayScrollDrag() => PlaySFX(_scrollDragSound);
 
     private void PlaySFX(AudioClip clip)
     {

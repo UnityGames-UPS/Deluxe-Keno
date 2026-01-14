@@ -7,6 +7,7 @@ using DG.Tweening;
 /// <summary>
 /// FIXED: Scroll buttons now show correct state on start
 /// Left button should be disabled at start, right button should be enabled
+/// NEW: Added scroll sound effects - single sound for buttons, continuous for dragging
 /// </summary>
 public class QuickPickView : MonoBehaviour
 {
@@ -26,11 +27,20 @@ public class QuickPickView : MonoBehaviour
     [SerializeField] private Color _normalTextColor = Color.white;
     [SerializeField] private Color _selectedTextColor = Color.yellow;
 
+    [Header("Scroll Sound Settings")]
+    [SerializeField] private float _scrollSoundThreshold = 0.01f; // Minimum movement to trigger sound
+
     private System.Random _random = new System.Random();
     private int _lastSelectedCount;
 
     // OPTIMIZATION: Reuse HashSet to avoid allocations
     private HashSet<int> _numberSet = new HashSet<int>();
+
+    // NEW: Scroll drag tracking
+    private bool _isDragging = false;
+    private float _lastScrollPosition = 0f;
+    private float _scrollSoundTimer = 0f;
+    private const float SCROLL_SOUND_INTERVAL = 0.1f; // Play sound every 0.1 seconds while dragging
 
     private void Start()
     {
@@ -42,10 +52,34 @@ public class QuickPickView : MonoBehaviour
         if (_scrollRect != null)
         {
             _scrollRect.horizontalNormalizedPosition = 0f;
+            _lastScrollPosition = 0f;
         }
 
         // Wait one frame for layout to settle, then update button states
         StartCoroutine(InitializeScrollButtons());
+    }
+
+    private void Update()
+    {
+        // NEW: Handle continuous scroll sound while dragging
+        if (_isDragging && _scrollRect != null)
+        {
+            float currentPos = _scrollRect.horizontalNormalizedPosition;
+            float movement = Mathf.Abs(currentPos - _lastScrollPosition);
+
+            if (movement > _scrollSoundThreshold)
+            {
+                _scrollSoundTimer += Time.deltaTime;
+
+                if (_scrollSoundTimer >= SCROLL_SOUND_INTERVAL)
+                {
+                    AudioManager.Instance.PlayScrollDrag();
+                    _scrollSoundTimer = 0f;
+                }
+            }
+
+            _lastScrollPosition = currentPos;
+        }
     }
 
     // FIXED: Initialize scroll buttons after layout is ready
@@ -109,7 +143,26 @@ public class QuickPickView : MonoBehaviour
             _scrollRightButton.onClick.AddListener(OnScrollRight);
 
         if (_scrollRect != null)
+        {
             _scrollRect.onValueChanged.AddListener(OnScrollValueChanged);
+
+            // NEW: Add event triggers for drag detection
+            UnityEngine.EventSystems.EventTrigger trigger = _scrollRect.GetComponent<UnityEngine.EventSystems.EventTrigger>();
+            if (trigger == null)
+                trigger = _scrollRect.gameObject.AddComponent<UnityEngine.EventSystems.EventTrigger>();
+
+            // Begin drag
+            UnityEngine.EventSystems.EventTrigger.Entry beginDragEntry = new UnityEngine.EventSystems.EventTrigger.Entry();
+            beginDragEntry.eventID = UnityEngine.EventSystems.EventTriggerType.BeginDrag;
+            beginDragEntry.callback.AddListener((data) => OnBeginDrag());
+            trigger.triggers.Add(beginDragEntry);
+
+            // End drag
+            UnityEngine.EventSystems.EventTrigger.Entry endDragEntry = new UnityEngine.EventSystems.EventTrigger.Entry();
+            endDragEntry.eventID = UnityEngine.EventSystems.EventTriggerType.EndDrag;
+            endDragEntry.callback.AddListener((data) => OnEndDrag());
+            trigger.triggers.Add(endDragEntry);
+        }
     }
 
     private void RemoveButtonListeners()
@@ -145,6 +198,21 @@ public class QuickPickView : MonoBehaviour
         GameEvents.OnGameEnded -= HandleGameEnded;
     }
 
+    // NEW: Drag detection handlers
+    private void OnBeginDrag()
+    {
+        _isDragging = true;
+        _scrollSoundTimer = 0f;
+        if (_scrollRect != null)
+            _lastScrollPosition = _scrollRect.horizontalNormalizedPosition;
+    }
+
+    private void OnEndDrag()
+    {
+        _isDragging = false;
+        _scrollSoundTimer = 0f;
+    }
+
     private void OnQuickPickClicked(int count)
     {
         _lastSelectedCount = count;
@@ -162,7 +230,7 @@ public class QuickPickView : MonoBehaviour
 
         List<int> randomNumbers = GenerateRandomNumbers(randomCount);
         GameEvents.TriggerQuickPickSelected(randomNumbers);
-       // UpdateButtonColors(randomCount);
+        // UpdateButtonColors(randomCount);
         AnimateButton(_shuffleButton);
         AudioManager.Instance.PlayButtonClick();
     }
@@ -184,7 +252,8 @@ public class QuickPickView : MonoBehaviour
                 scrollTween.Kill();
             });
 
-            AudioManager.Instance.PlayButtonClick();
+            // NEW: Play single scroll button sound
+            AudioManager.Instance.PlayScrollButton();
         }
     }
 
@@ -205,7 +274,8 @@ public class QuickPickView : MonoBehaviour
                 scrollTween.Kill();
             });
 
-            AudioManager.Instance.PlayButtonClick();
+            // NEW: Play single scroll button sound
+            AudioManager.Instance.PlayScrollButton();
         }
     }
 
