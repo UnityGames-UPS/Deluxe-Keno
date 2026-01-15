@@ -50,6 +50,9 @@ public class NumbersGridView : MonoBehaviour
         GameEvents.OnGameStarted += HandleGameStarted;
         GameEvents.OnBallDrawn += HandleBallDrawn;
         GameEvents.OnGameEnded += HandleGameEnded;
+
+        // NEW: Subscribe to visual update event
+        GameEvents.OnNumberVisualUpdate += HandleNumberVisualUpdate;
     }
 
     private void UnsubscribeFromEvents()
@@ -59,6 +62,21 @@ public class NumbersGridView : MonoBehaviour
         GameEvents.OnGameStarted -= HandleGameStarted;
         GameEvents.OnBallDrawn -= HandleBallDrawn;
         GameEvents.OnGameEnded -= HandleGameEnded;
+
+        // NEW: Unsubscribe from visual update event
+        GameEvents.OnNumberVisualUpdate -= HandleNumberVisualUpdate;
+    }
+
+    // NEW: Handle visual updates from GameController after validation
+    private void HandleNumberVisualUpdate(int number, bool selected)
+    {
+        if (_numberButtons.TryGetValue(number, out NumberButton button))
+        {
+            if (selected)
+                button.Select();
+            else
+                button.Deselect();
+        }
     }
 
     private void HandleClearAll()

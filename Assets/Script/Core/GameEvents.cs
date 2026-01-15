@@ -2,7 +2,7 @@ using System;
 using System.Collections.Generic;
 
 /// <summary>
-/// ENHANCED GameEvents with Game Exit event added
+/// FIXED GameEvents with number visual update event
 /// </summary>
 public static class GameEvents
 {
@@ -11,6 +11,9 @@ public static class GameEvents
     public static event Action<int> OnNumberDeselected;
     public static event Action OnAllNumbersCleared;
     public static event Action<List<int>> OnQuickPickSelected;
+
+    // NEW: Event for updating button visual state after validation
+    public static event Action<int, bool> OnNumberVisualUpdate;
 
     // Betting Events
     public static event Action<float> OnBetChanged;
@@ -23,7 +26,7 @@ public static class GameEvents
     public static event Action<GameResultData> OnGameResultReceived;
     public static event Action OnGameEnded;
     public static event Action OnRoundCompleted;
-    public static event Action OnGameExit;  // NEW: Game exit event
+    public static event Action OnGameExit;
 
     // UI Events
     public static event Action<SpeedMode> OnSpeedModeChanged;
@@ -61,6 +64,9 @@ public static class GameEvents
     public static void TriggerAllNumbersCleared() => OnAllNumbersCleared?.Invoke();
     public static void TriggerQuickPickSelected(List<int> numbers) => OnQuickPickSelected?.Invoke(numbers);
 
+    // NEW: Trigger visual update for specific button
+    public static void TriggerNumberVisualUpdate(int number, bool selected) => OnNumberVisualUpdate?.Invoke(number, selected);
+
     // Trigger Methods - Betting
     public static void TriggerBetChanged(float bet) => OnBetChanged?.Invoke(bet);
     public static void TriggerAutoBetRoundsChanged(int rounds) => OnAutoBetRoundsChanged?.Invoke(rounds);
@@ -72,7 +78,7 @@ public static class GameEvents
     public static void TriggerGameResultReceived(GameResultData result) => OnGameResultReceived?.Invoke(result);
     public static void TriggerGameEnded() => OnGameEnded?.Invoke();
     public static void TriggerRoundCompleted() => OnRoundCompleted?.Invoke();
-    public static void TriggerGameExit() => OnGameExit?.Invoke();  // NEW: Game exit trigger
+    public static void TriggerGameExit() => OnGameExit?.Invoke();
 
     // Trigger Methods - UI
     public static void TriggerSpeedModeChanged(SpeedMode mode) => OnSpeedModeChanged?.Invoke(mode);

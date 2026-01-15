@@ -213,14 +213,25 @@ public class GameController : MonoBehaviour
     {
         if (!_isInitialized || _model.GameState.isPlaying) return;
 
+        // Check if player already has max selections
+        if (_model.PlayerData.selectedNumbers.Count >= _model.InitData.maximumPicks &&
+            !_model.PlayerData.selectedNumbers.Contains(number))
+        {
+            // Show error - do NOT select the button
+            ErrorPopupManager.ShowError(ErrorMessages.TOO_MANY_NUMBERS);
+            return; // Exit without selecting
+        }
+
+        // Check if selection is valid
         if (_model.CanSelectNumber(number))
         {
+            // Valid selection - update model
             _model.SelectNumber(number);
+
+            // Tell the specific button to visually select itself
+            TriggerButtonSelection(number, true);
+
             GameEvents.TriggerPaytableUpdate(_model.PlayerData.selectedNumbers.Count);
-        }
-        else if (_model.PlayerData.selectedNumbers.Count >= _model.InitData.maximumPicks)
-        {
-            ErrorPopupManager.ShowError(ErrorMessages.TOO_MANY_NUMBERS);
         }
     }
 
@@ -228,8 +239,27 @@ public class GameController : MonoBehaviour
     {
         if (!_isInitialized || _model.GameState.isPlaying) return;
 
+        // Update model
         _model.DeselectNumber(number);
+
+        // Tell the specific button to visually deselect itself
+        TriggerButtonSelection(number, false);
+
         GameEvents.TriggerPaytableUpdate(_model.PlayerData.selectedNumbers.Count);
+    }
+
+    // Helper method to trigger button visual state changes
+    private void TriggerButtonSelection(int number, bool select)
+    {
+        NumbersGridView gridView = FindObjectOfType<NumbersGridView>();
+        if (gridView != null)
+        {
+            // Trigger event to update the specific button's visual state
+            if (select)
+                GameEvents.TriggerNumberVisualUpdate(number, true);
+            else
+                GameEvents.TriggerNumberVisualUpdate(number, false);
+        }
     }
 
     private void HandleClearAll()
@@ -251,7 +281,7 @@ public class GameController : MonoBehaviour
         GameEvents.TriggerPaytableUpdate(_model.PlayerData.selectedNumbers.Count);
     }
     #endregion
-
+   
     #region Betting Handlers
     private void HandleBetChanged(float bet)
     {
