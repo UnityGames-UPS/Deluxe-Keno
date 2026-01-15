@@ -3,19 +3,17 @@ using UnityEngine;
 using UnityEngine.UI;
 using TMPro;
 using DG.Tweening;
-
-/// <summary>
-/// FIXED: Scroll buttons now show correct state on start
-/// Left button should be disabled at start, right button should be enabled
-/// NEW: Added scroll sound effects - single sound for buttons, continuous for dragging
-/// </summary>
 public class QuickPickView : MonoBehaviour
 {
     [Header("Quick Pick Buttons")]
     [SerializeField] private Button[] _quickPickButtons = new Button[15];
+    [SerializeField] private GameObject[] _selectedImages = new GameObject[15];
 
     [Header("Special Buttons")]
     [SerializeField] private Button _shuffleButton;
+    [SerializeField] private GameObject _shuffleButtonselected;
+    [SerializeField] private GameObject _shuffleButtonicon;
+    [SerializeField] private GameObject _shuffleButtonselectedicon;
 
     [Header("Scroll View")]
     [SerializeField] private ScrollRect _scrollRect;
@@ -28,65 +26,64 @@ public class QuickPickView : MonoBehaviour
     [SerializeField] private Color _selectedTextColor = Color.yellow;
 
     [Header("Scroll Sound Settings")]
-    [SerializeField] private float _scrollSoundThreshold = 0.01f; // Minimum movement to trigger sound
+    [SerializeField] private float _scrollSoundThreshold = 0.05f; // Threshold for detecting button boundary crossing
 
     private System.Random _random = new System.Random();
     private int _lastSelectedCount;
+    private bool _isShuffleSelected = false;
 
-    // OPTIMIZATION: Reuse HashSet to avoid allocations
     private HashSet<int> _numberSet = new HashSet<int>();
 
-    // NEW: Scroll drag tracking
-    private bool _isDragging = false;
     private float _lastScrollPosition = 0f;
-    private float _scrollSoundTimer = 0f;
-    private const float SCROLL_SOUND_INTERVAL = 0.1f; // Play sound every 0.1 seconds while dragging
+    private int _lastVisibleButtonCount = 0;
 
     private void Start()
     {
+        InitializeSelectedImages();
         SetupButtonListeners();
         SubscribeToEvents();
 
-        // FIXED: Initialize scroll state properly on start
-        // Force scroll to leftmost position
         if (_scrollRect != null)
         {
             _scrollRect.horizontalNormalizedPosition = 0f;
             _lastScrollPosition = 0f;
         }
 
-        // Wait one frame for layout to settle, then update button states
         StartCoroutine(InitializeScrollButtons());
     }
 
     private void Update()
     {
-        // NEW: Handle continuous scroll sound while dragging
-        if (_isDragging && _scrollRect != null)
-        {
-            float currentPos = _scrollRect.horizontalNormalizedPosition;
-            float movement = Mathf.Abs(currentPos - _lastScrollPosition);
-
-            if (movement > _scrollSoundThreshold)
-            {
-                _scrollSoundTimer += Time.deltaTime;
-
-                if (_scrollSoundTimer >= SCROLL_SOUND_INTERVAL)
-                {
-                    AudioManager.Instance.PlayScrollDrag();
-                    _scrollSoundTimer = 0f;
-                }
-            }
-
-            _lastScrollPosition = currentPos;
-        }
+        CheckScrollBoundary();
     }
 
-    // FIXED: Initialize scroll buttons after layout is ready
+    private void InitializeSelectedImages()
+    {
+        for (int i = 0; i < _selectedImages.Length; i++)
+        {
+            if (_selectedImages[i] != null)
+            {
+                _selectedImages[i].SetActive(false);
+            }
+        }
+
+        if (_shuffleButtonselected != null)
+            _shuffleButtonselected.SetActive(false);
+
+        if (_shuffleButtonselectedicon != null)
+            _shuffleButtonselectedicon.SetActive(false);
+
+        if (_shuffleButtonicon != null)
+            _shuffleButtonicon.SetActive(true);
+
+        _isShuffleSelected = false;
+    }
+
     private System.Collections.IEnumerator InitializeScrollButtons()
     {
-        yield return null; // Wait one frame for layout
+        yield return null;
         UpdateScrollButtonStates();
+        _lastVisibleButtonCount = CountVisibleButtons();
     }
 
     private void OnDestroy()
@@ -106,8 +103,14 @@ public class QuickPickView : MonoBehaviour
 
         if (_shuffleButton != null)
             _shuffleButton.transform.DOKill(true);
+
+        if (_scrollRect != null)
+            DOTween.Kill(_scrollRect);
     }
 
+    /// <summary>
+    /// Animates button with punch effect without affecting scroll layout
+    /// </summary>
     private void AnimateButton(Button button)
     {
         if (button == null) return;
@@ -115,11 +118,14 @@ public class QuickPickView : MonoBehaviour
         button.transform.DOKill(true);
         button.transform.localScale = Vector3.one;
 
-        Tween punchTween = button.transform.DOPunchScale(Vector3.one * 0.15f, 0.2f, 5, 0.5f)
+        // Use local scale animation that doesn't trigger layout rebuild
+        button.transform.DOPunchScale(Vector3.one * 0.15f, 0.2f, 5, 0.5f)
             .SetUpdate(true)
-            .SetRecyclable(true);
-
-        punchTween.OnComplete(() => punchTween.Kill());
+            .SetRecyclable(true)
+            .OnComplete(() => {
+                // Ensure scale returns to exactly 1
+                button.transform.localScale = Vector3.one;
+            });
     }
 
     private void SetupButtonListeners()
@@ -145,23 +151,6 @@ public class QuickPickView : MonoBehaviour
         if (_scrollRect != null)
         {
             _scrollRect.onValueChanged.AddListener(OnScrollValueChanged);
-
-            // NEW: Add event triggers for drag detection
-            UnityEngine.EventSystems.EventTrigger trigger = _scrollRect.GetComponent<UnityEngine.EventSystems.EventTrigger>();
-            if (trigger == null)
-                trigger = _scrollRect.gameObject.AddComponent<UnityEngine.EventSystems.EventTrigger>();
-
-            // Begin drag
-            UnityEngine.EventSystems.EventTrigger.Entry beginDragEntry = new UnityEngine.EventSystems.EventTrigger.Entry();
-            beginDragEntry.eventID = UnityEngine.EventSystems.EventTriggerType.BeginDrag;
-            beginDragEntry.callback.AddListener((data) => OnBeginDrag());
-            trigger.triggers.Add(beginDragEntry);
-
-            // End drag
-            UnityEngine.EventSystems.EventTrigger.Entry endDragEntry = new UnityEngine.EventSystems.EventTrigger.Entry();
-            endDragEntry.eventID = UnityEngine.EventSystems.EventTriggerType.EndDrag;
-            endDragEntry.callback.AddListener((data) => OnEndDrag());
-            trigger.triggers.Add(endDragEntry);
         }
     }
 
@@ -198,27 +187,18 @@ public class QuickPickView : MonoBehaviour
         GameEvents.OnGameEnded -= HandleGameEnded;
     }
 
-    // NEW: Drag detection handlers
-    private void OnBeginDrag()
-    {
-        _isDragging = true;
-        _scrollSoundTimer = 0f;
-        if (_scrollRect != null)
-            _lastScrollPosition = _scrollRect.horizontalNormalizedPosition;
-    }
-
-    private void OnEndDrag()
-    {
-        _isDragging = false;
-        _scrollSoundTimer = 0f;
-    }
-
     private void OnQuickPickClicked(int count)
     {
         _lastSelectedCount = count;
+        _isShuffleSelected = false;
+
         List<int> randomNumbers = GenerateRandomNumbers(count);
         GameEvents.TriggerQuickPickSelected(randomNumbers);
+
         UpdateButtonColors(count);
+        UpdateSelectedImages(count);
+        UpdateShuffleButtonState(false);
+
         AnimateButton(_quickPickButtons[count - 1]);
         AudioManager.Instance.PlayButtonClick();
     }
@@ -227,10 +207,15 @@ public class QuickPickView : MonoBehaviour
     {
         int randomCount = _random.Next(1, 16);
         _lastSelectedCount = randomCount;
+        _isShuffleSelected = true;
 
         List<int> randomNumbers = GenerateRandomNumbers(randomCount);
         GameEvents.TriggerQuickPickSelected(randomNumbers);
-        // UpdateButtonColors(randomCount);
+
+        UpdateButtonColors(randomCount);
+        UpdateSelectedImages(randomCount); 
+        UpdateShuffleButtonState(true); 
+
         AnimateButton(_shuffleButton);
         AudioManager.Instance.PlayButtonClick();
     }
@@ -251,9 +236,6 @@ public class QuickPickView : MonoBehaviour
                 UpdateScrollButtonStates();
                 scrollTween.Kill();
             });
-
-            // NEW: Play single scroll button sound
-            AudioManager.Instance.PlayScrollButton();
         }
     }
 
@@ -273,9 +255,6 @@ public class QuickPickView : MonoBehaviour
                 UpdateScrollButtonStates();
                 scrollTween.Kill();
             });
-
-            // NEW: Play single scroll button sound
-            AudioManager.Instance.PlayScrollButton();
         }
     }
 
@@ -284,25 +263,88 @@ public class QuickPickView : MonoBehaviour
         UpdateScrollButtonStates();
     }
 
-    // FIXED: Proper scroll button state logic
-    // At position 0 (leftmost): Left button disabled, Right button enabled
-    // At position 1 (rightmost): Left button enabled, Right button disabled
+    private void CheckScrollBoundary()
+    {
+        if (_scrollRect == null) return;
+
+        float currentScrollPos = _scrollRect.horizontalNormalizedPosition;
+        float scrollDelta = Mathf.Abs(currentScrollPos - _lastScrollPosition);
+
+        // Increased threshold to ignore tiny movements from button animations
+        if (scrollDelta > 0.02f) // Increased from 0.05f to better filter animation noise
+        {
+            int currentVisibleButtons = CountVisibleButtons();
+
+            // Play sound when the number of visible buttons changes (button entered/exited viewport)
+            if (currentVisibleButtons != _lastVisibleButtonCount)
+            {
+                AudioManager.Instance.PlayScrollDrag();
+                _lastVisibleButtonCount = currentVisibleButtons;
+            }
+
+            _lastScrollPosition = currentScrollPos;
+        }
+    }
+
+    /// <summary>
+    /// Counts how many buttons are currently visible in the viewport
+    /// </summary>
+    private int CountVisibleButtons()
+    {
+        if (_scrollRect == null || _scrollRect.content == null || _scrollRect.viewport == null)
+            return 0;
+
+        int visibleCount = 0;
+        RectTransform viewportRect = _scrollRect.viewport;
+
+        for (int i = 0; i < _quickPickButtons.Length; i++)
+        {
+            if (_quickPickButtons[i] != null)
+            {
+                RectTransform buttonRect = _quickPickButtons[i].GetComponent<RectTransform>();
+                if (buttonRect != null && IsButtonVisible(buttonRect, viewportRect))
+                {
+                    visibleCount++;
+                }
+            }
+        }
+
+        return visibleCount;
+    }
+
+    /// <summary>
+    /// Checks if a button is visible within the viewport
+    /// </summary>
+    private bool IsButtonVisible(RectTransform buttonRect, RectTransform viewportRect)
+    {
+        Vector3[] buttonCorners = new Vector3[4];
+        Vector3[] viewportCorners = new Vector3[4];
+
+        buttonRect.GetWorldCorners(buttonCorners);
+        viewportRect.GetWorldCorners(viewportCorners);
+
+        // Check if button's center is within viewport bounds
+        float buttonCenterX = (buttonCorners[0].x + buttonCorners[2].x) / 2f;
+        float viewportMinX = viewportCorners[0].x;
+        float viewportMaxX = viewportCorners[2].x;
+
+        return buttonCenterX >= viewportMinX && buttonCenterX <= viewportMaxX;
+    }
+
     private void UpdateScrollButtonStates()
     {
         if (_scrollRect == null) return;
 
         float scrollPos = _scrollRect.horizontalNormalizedPosition;
 
-        // FIXED: Left button disabled when at leftmost position (0)
+        // Increased tolerance to prevent flickering from small animation movements
         if (_scrollLeftButton != null)
-            _scrollLeftButton.interactable = scrollPos > 0.01f;
+            _scrollLeftButton.interactable = scrollPos > 0.05f;
 
-        // FIXED: Right button enabled when at leftmost position (0)
         if (_scrollRightButton != null)
-            _scrollRightButton.interactable = scrollPos < 0.99f;
+            _scrollRightButton.interactable = scrollPos < 0.95f;
     }
 
-    // OPTIMIZED: Reuse HashSet instead of creating new ones
     private List<int> GenerateRandomNumbers(int count)
     {
         _numberSet.Clear();
@@ -313,7 +355,6 @@ public class QuickPickView : MonoBehaviour
             _numberSet.Add(randomNumber);
         }
 
-        // Use pooled list
         List<int> result = ListPool<int>.Get();
         result.AddRange(_numberSet);
 
@@ -328,9 +369,40 @@ public class QuickPickView : MonoBehaviour
             {
                 TextMeshProUGUI btnText = _quickPickButtons[i].GetComponentInChildren<TextMeshProUGUI>();
                 if (btnText != null)
+                {
                     btnText.color = (i + 1 == selectedCount) ? _selectedTextColor : _normalTextColor;
+                }
             }
         }
+    }
+
+    /// <summary>
+    /// Updates selected images - shows the selected button's image
+    /// </summary>
+    private void UpdateSelectedImages(int selectedCount)
+    {
+        for (int i = 0; i < _selectedImages.Length; i++)
+        {
+            if (_selectedImages[i] != null)
+            {
+                _selectedImages[i].SetActive(i + 1 == selectedCount);
+            }
+        }
+    }
+
+    /// <summary>
+    /// Updates shuffle button visual state (icons and selected image)
+    /// </summary>
+    private void UpdateShuffleButtonState(bool isSelected)
+    {
+        if (_shuffleButtonselected != null)
+            _shuffleButtonselected.SetActive(isSelected);
+
+        if (_shuffleButtonselectedicon != null)
+            _shuffleButtonselectedicon.SetActive(isSelected);
+
+        if (_shuffleButtonicon != null)
+            _shuffleButtonicon.SetActive(!isSelected);
     }
 
     private void HandleGameStarted()
@@ -355,9 +427,9 @@ public class QuickPickView : MonoBehaviour
             _shuffleButton.interactable = interactable;
 
         if (_scrollLeftButton != null)
-            _scrollLeftButton.interactable = interactable && _scrollRect.horizontalNormalizedPosition > 0.01f;
+            _scrollLeftButton.interactable = interactable && _scrollRect.horizontalNormalizedPosition > 0.05f;
 
         if (_scrollRightButton != null)
-            _scrollRightButton.interactable = interactable && _scrollRect.horizontalNormalizedPosition < 0.99f;
+            _scrollRightButton.interactable = interactable && _scrollRect.horizontalNormalizedPosition < 0.95f;
     }
 }
