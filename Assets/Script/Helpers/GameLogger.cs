@@ -1,78 +1,47 @@
 using UnityEngine;
-using System.Diagnostics;
 
-/// <summary>
-/// Optimized logger that strips logs in production builds
-/// Only shows necessary connection and response logs
-/// </summary>
+
 public static class GameLogger
 {
-    // Connection logs (always shown)
-    public static void LogConnection(string message)
+    private const string PREFIX_SOCKET = "[Socket]";
+    private const string PREFIX_CONNECTION = "[Connection]";
+
+    public static void Log(string message)
     {
-        UnityEngine.Debug.Log($"[CONNECTION] {message}");
+        // Disabled in production - only enable for debugging
+        // Debug.Log(message);
     }
 
-    public static void LogConnectionError(string message)
+    public static void LogConnection(string message)
     {
-        UnityEngine.Debug.LogError($"[CONNECTION ERROR] {message}");
+        Debug.Log($"{PREFIX_CONNECTION} {message}");
     }
 
     public static void LogConnectionWarning(string message)
     {
-        UnityEngine.Debug.LogWarning($"[CONNECTION WARNING] {message}");
+        Debug.LogWarning($"{PREFIX_CONNECTION} {message}");
     }
 
-    // Server response logs (always shown)
-    public static void LogServerResponse(string eventName, string data)
+    public static void LogConnectionError(string message)
     {
-        UnityEngine.Debug.Log($"[SERVER] Event: {eventName}\nData: {data}");
+        Debug.LogError($"{PREFIX_CONNECTION} {message}");
     }
 
-    public static void LogServerSend(string eventName, string data = null)
+    public static void LogServerSend(string eventName, string json = null)
     {
-        string message = string.IsNullOrEmpty(data)
-            ? $"[SERVER SEND] Event: {eventName}"
-            : $"[SERVER SEND] Event: {eventName}\nPayload: {data}";
-        UnityEngine.Debug.Log(message);
+        if (string.IsNullOrEmpty(json))
+            Debug.Log($"{PREFIX_SOCKET} Sending: {eventName}");
+        else
+            Debug.Log($"{PREFIX_SOCKET} Sending {eventName}: {json}");
     }
 
-    // Debug logs (stripped in production)
-    [Conditional("UNITY_EDITOR"), Conditional("DEVELOPMENT_BUILD")]
-    public static void Log(string message)
+    public static void LogServerResponse(string eventName, string json)
     {
-        UnityEngine.Debug.Log(message);
+        Debug.Log($"{PREFIX_SOCKET} Received {eventName}: {json}");
     }
 
-    [Conditional("UNITY_EDITOR"), Conditional("DEVELOPMENT_BUILD")]
-    public static void LogWarning(string message)
-    {
-        UnityEngine.Debug.LogWarning(message);
-    }
-
-    [Conditional("UNITY_EDITOR"), Conditional("DEVELOPMENT_BUILD")]
     public static void LogError(string message)
     {
-        UnityEngine.Debug.LogError(message);
-    }
-
-    // Game state logs (stripped in production)
-    [Conditional("UNITY_EDITOR"), Conditional("DEVELOPMENT_BUILD")]
-    public static void LogGameState(string state, string details = "")
-    {
-        string message = string.IsNullOrEmpty(details)
-            ? $"[GAME STATE] {state}"
-            : $"[GAME STATE] {state} - {details}";
-        UnityEngine.Debug.Log(message);
-    }
-
-    // Animation logs (stripped in production)
-    [Conditional("UNITY_EDITOR"), Conditional("DEVELOPMENT_BUILD")]
-    public static void LogAnimation(string animationName, string details = "")
-    {
-        string message = string.IsNullOrEmpty(details)
-            ? $"[ANIMATION] {animationName}"
-            : $"[ANIMATION] {animationName} - {details}";
-        UnityEngine.Debug.Log(message);
+        Debug.LogError(message);
     }
 }

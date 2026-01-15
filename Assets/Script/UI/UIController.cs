@@ -5,11 +5,6 @@ using DG.Tweening;
 using System.Collections;
 using System.Text;
 
-/// <summary>
-/// ENHANCED UIController - Original Working Version + Connection/Quit Popups
-/// All existing functionality preserved
-/// NEW features clearly marked with // NEW: comments
-/// </summary>
 public class UIController : MonoBehaviour
 {
     [Header("Main Buttons")]
@@ -30,8 +25,6 @@ public class UIController : MonoBehaviour
     [SerializeField] private GameObject _turboSpeedSelected;
     [SerializeField] private Button _instantSpeedButton;
     [SerializeField] private GameObject _instantSpeedSelected;
-
-    [Header("Speed Button Text Colors")]
     [SerializeField] private Color _speedNormalColor = Color.white;
     [SerializeField] private Color _speedSelectedColor = Color.yellow;
 
@@ -41,21 +34,12 @@ public class UIController : MonoBehaviour
     [SerializeField] private TextMeshProUGUI _winAmountText;
     [SerializeField] private TextMeshProUGUI _autoPlayRoundsText;
 
-    // NEW: Connection Popups
-    [Header("Disconnection Popup")]
-    [SerializeField] private Button _closeDisconnectButton;
-    [SerializeField] private GameObject _disconnectPopupObject;
-
-    // NEW: Reconnection Popup
-    [Header("Reconnection Popup")]
-    [SerializeField] private TextMeshProUGUI _reconnectText;
-    [SerializeField] private GameObject _reconnectPopupObject;
-
-    // NEW: Main Popup Panel
-    [Header("Main Popup Panel")]
+    [Header("Connection Popups")]
     [SerializeField] private GameObject _mainPopupObject;
+    [SerializeField] private GameObject _disconnectPopupObject;
+    [SerializeField] private GameObject _reconnectPopupObject;
+    [SerializeField] private Button _closeDisconnectButton;
 
-    // NEW: Quit Game Popup
     [Header("Quit Game Popup")]
     [SerializeField] private GameObject _quitGameObject;
     [SerializeField] private Button _quitGameButton;
@@ -68,8 +52,6 @@ public class UIController : MonoBehaviour
     [SerializeField] private Button[] _betButtons = new Button[8];
     [SerializeField] private GameObject[] _betButtonsSelected = new GameObject[8];
     [SerializeField] private Button _betPopupCloseButton;
-
-    [Header("Bet Button Colors")]
     [SerializeField] private Color _betNormalColor = Color.white;
     [SerializeField] private Color _betSelectedColor = Color.yellow;
 
@@ -80,8 +62,6 @@ public class UIController : MonoBehaviour
     [SerializeField] private GameObject[] _autoRoundButtonsSelected = new GameObject[8];
     [SerializeField] private Button _startAutoPlayButton;
     [SerializeField] private Button _autoBetPopupCloseButton;
-
-    [Header("Auto Round Button Colors")]
     [SerializeField] private Color _autoNormalColor = Color.white;
     [SerializeField] private Color _autoSelectedColor = Color.yellow;
 
@@ -103,28 +83,26 @@ public class UIController : MonoBehaviour
     private Coroutine _winPopupCoroutine;
     private bool _isInitialized;
 
-    // NEW: User quit flag (CRITICAL - must be internal)
     internal bool IsQuitSelf = false;
 
-    // OPTIMIZATION: Cached string builder to reduce GC
     private StringBuilder _stringBuilder = new StringBuilder(32);
 
-    // OPTIMIZATION: Cached format strings
-    private const string BALANCE_FORMAT = "{0:F2}";
-    private const string BET_FORMAT = "{0:F2}";
-    private const string WIN_FORMAT = "{0:F2}";
+    public enum PopupPriority
+    {
+        None = 0,
+        Reconnect = 1,
+        Disconnect = 2,
+        Quit = 3
+    }
+
+    private PopupPriority _currentPopupPriority = PopupPriority.None;
 
     private void Start()
     {
-        // NEW: Reset quit flag
         IsQuitSelf = false;
-
         InitializeUI();
         SubscribeToEvents();
         SetupButtonListeners();
-       // StartCoroutine(WaitForGameControllerAndInitialize());
-
-        // Start background music
         AudioManager.Instance.PlayBackgroundMusic();
     }
 
@@ -150,8 +128,7 @@ public class UIController : MonoBehaviour
 
             if (elapsed > timeout)
             {
-                // NEW: Show disconnect popup on timeout
-                DisconnectionPopup();
+                ShowPopup(_disconnectPopupObject, PopupPriority.Disconnect);
                 yield break;
             }
         }
@@ -165,9 +142,7 @@ public class UIController : MonoBehaviour
     private void InitializeFromGameModel()
     {
         GameModel model = GameController.Instance.GetModel();
-
-        if (model == null || model.InitData == null)
-            return;
+        if (model == null || model.InitData == null) return;
 
         _selectedBet = model.PlayerData.currentBet;
         UpdateBetDisplay(_selectedBet);
@@ -177,14 +152,9 @@ public class UIController : MonoBehaviour
 
     private void SetLoadingState()
     {
-        if (_balanceText != null)
-            _balanceText.text = _loadingText;
-
-        if (_betAmountText != null)
-            _betAmountText.text = _loadingText;
-
-        if (_winAmountText != null)
-            _winAmountText.text = "0.00";
+        if (_balanceText != null) _balanceText.text = _loadingText;
+        if (_betAmountText != null) _betAmountText.text = _loadingText;
+        if (_winAmountText != null) _winAmountText.text = "0.00";
     }
 
     private void InitializeUI()
@@ -194,14 +164,11 @@ public class UIController : MonoBehaviour
         _betPopupMainPanel?.SetActive(false);
         _autoBetPopupMainPanel?.SetActive(false);
         _winPopupMainPanel?.SetActive(false);
-
-        // NEW: Initialize connection popups as hidden
         _mainPopupObject?.SetActive(false);
         _reconnectPopupObject?.SetActive(false);
         _disconnectPopupObject?.SetActive(false);
         _quitGameObject?.SetActive(false);
 
-        // FIXED: Play button always visible and interactable at start
         if (_playButton != null)
         {
             _playButton.gameObject.SetActive(true);
@@ -212,16 +179,12 @@ public class UIController : MonoBehaviour
             _pauseButton.gameObject.SetActive(false);
 
         UpdateSpeedButtonStates();
-
-        if (_betButtonSelected != null)
-            _betButtonSelected.SetActive(false);
-
-        if (_autoBetButtonSelected != null)
-            _autoBetButtonSelected.SetActive(false);
-
+        _betButtonSelected?.SetActive(false);
+        _autoBetButtonSelected?.SetActive(false);
         SetMainControlButtonsInteractable(true);
     }
 
+    #region Button Setup
     private void SetupButtonListeners()
     {
         _playButton?.onClick.AddListener(OnPlayClicked);
@@ -229,37 +192,27 @@ public class UIController : MonoBehaviour
         _clearButton?.onClick.AddListener(OnClearClicked);
         _betButton?.onClick.AddListener(OnBetClicked);
         _autoBetButton?.onClick.AddListener(OnAutoBetClicked);
-
         _normalSpeedButton?.onClick.AddListener(() => OnSpeedChanged(SpeedMode.Normal));
         _turboSpeedButton?.onClick.AddListener(() => OnSpeedChanged(SpeedMode.Turbo));
         _instantSpeedButton?.onClick.AddListener(() => OnSpeedChanged(SpeedMode.Instant));
         _betPopupCloseButton?.onClick.AddListener(CloseBetPopup);
         _autoBetPopupCloseButton?.onClick.AddListener(CloseAutoBetPopup);
         _startAutoPlayButton?.onClick.AddListener(OnStartAutoPlayClicked);
-
-        // NEW: Connection popup buttons
-        _closeDisconnectButton?.onClick.AddListener(delegate {
-            GameController.Instance?.CloseSocket();
-        });
-
-        // NEW: Quit game buttons
+        _closeDisconnectButton?.onClick.AddListener(() => GameController.Instance?.CloseSocket());
         _quitGameButton?.onClick.AddListener(OpenQuitGamePopup);
         _yesQuitButton?.onClick.AddListener(QuitGame);
         _noQuitButton?.onClick.AddListener(CloseQuitGamePopup);
 
-        if (_betPopupMainPanel != null)
-        {
-            Button mainPanelBtn = _betPopupMainPanel.GetComponent<Button>();
-            if (mainPanelBtn == null) mainPanelBtn = _betPopupMainPanel.AddComponent<Button>();
-            mainPanelBtn.onClick.AddListener(CloseBetPopup);
-        }
+        AddBackgroundClickListener(_betPopupMainPanel, CloseBetPopup);
+        AddBackgroundClickListener(_autoBetPopupMainPanel, CloseAutoBetPopup);
+    }
 
-        if (_autoBetPopupMainPanel != null)
-        {
-            Button mainPanelBtn = _autoBetPopupMainPanel.GetComponent<Button>();
-            if (mainPanelBtn == null) mainPanelBtn = _autoBetPopupMainPanel.AddComponent<Button>();
-            mainPanelBtn.onClick.AddListener(CloseAutoBetPopup);
-        }
+    private void AddBackgroundClickListener(GameObject panel, UnityEngine.Events.UnityAction action)
+    {
+        if (panel == null) return;
+        Button btn = panel.GetComponent<Button>();
+        if (btn == null) btn = panel.AddComponent<Button>();
+        btn.onClick.AddListener(action);
     }
 
     private void RemoveButtonListeners()
@@ -269,22 +222,20 @@ public class UIController : MonoBehaviour
         _clearButton?.onClick.RemoveAllListeners();
         _betButton?.onClick.RemoveAllListeners();
         _autoBetButton?.onClick.RemoveAllListeners();
-
         _normalSpeedButton?.onClick.RemoveAllListeners();
         _turboSpeedButton?.onClick.RemoveAllListeners();
         _instantSpeedButton?.onClick.RemoveAllListeners();
-
         _betPopupCloseButton?.onClick.RemoveAllListeners();
         _autoBetPopupCloseButton?.onClick.RemoveAllListeners();
         _startAutoPlayButton?.onClick.RemoveAllListeners();
-
-        // NEW: Remove connection popup listeners
         _quitGameButton?.onClick.RemoveAllListeners();
         _yesQuitButton?.onClick.RemoveAllListeners();
         _noQuitButton?.onClick.RemoveAllListeners();
         _closeDisconnectButton?.onClick.RemoveAllListeners();
     }
+    #endregion
 
+    #region Event Subscriptions
     private void SubscribeToEvents()
     {
         GameEvents.OnBalanceUpdated += UpdateBalanceDisplay;
@@ -295,9 +246,7 @@ public class UIController : MonoBehaviour
         GameEvents.OnAutoPlayToggled += HandleAutoPlayToggled;
         GameEvents.OnShowWinPopup += ShowWinPopup;
         GameEvents.OnSpeedModeChanged += HandleSpeedModeChanged;
-
-        // NEW: Connection event handlers
-        GameEvents.OnConnectionUnstable += ReconnectionPopup;
+        GameEvents.OnConnectionUnstable += () => ShowPopup(_reconnectPopupObject, PopupPriority.Reconnect);
         GameEvents.OnConnectionLost += HandleConnectionLost;
         GameEvents.OnConnectionRestored += CheckAndClosePopups;
     }
@@ -312,14 +261,10 @@ public class UIController : MonoBehaviour
         GameEvents.OnAutoPlayToggled -= HandleAutoPlayToggled;
         GameEvents.OnShowWinPopup -= ShowWinPopup;
         GameEvents.OnSpeedModeChanged -= HandleSpeedModeChanged;
-
-        // NEW: Unsubscribe connection handlers
-        GameEvents.OnConnectionUnstable -= ReconnectionPopup;
-        GameEvents.OnConnectionLost -= HandleConnectionLost;
-        GameEvents.OnConnectionRestored -= CheckAndClosePopups;
     }
+    #endregion
 
-    #region Display Updates - OPTIMIZED
+    #region Display Updates
     private void UpdateBalanceDisplay(float balance)
     {
         if (_balanceText != null)
@@ -359,14 +304,14 @@ public class UIController : MonoBehaviour
     private void OnPlayClicked()
     {
         if (!_isInitialized) return;
-        AnimateButtonPress(_playButton?.gameObject);
+        AnimateButton(_playButton?.gameObject);
         AudioManager.Instance.PlayPlayButton();
         GameEvents.TriggerPlayButtonClicked();
     }
 
     private void OnPauseClicked()
     {
-        AnimateButtonPress(_pauseButton?.gameObject);
+        AnimateButton(_pauseButton?.gameObject);
         AudioManager.Instance.PlayButtonClick();
         _isAutoPlayMode = false;
         GameEvents.TriggerAutoPlayToggled(false);
@@ -374,21 +319,21 @@ public class UIController : MonoBehaviour
 
     private void OnClearClicked()
     {
-        AnimateButtonPress(_clearButton?.gameObject);
+        AnimateButton(_clearButton?.gameObject);
         AudioManager.Instance.PlayButtonClick();
         GameEvents.TriggerAllNumbersCleared();
     }
 
     private void OnBetClicked()
     {
-        AnimateButtonPress(_betButton?.gameObject);
+        AnimateButton(_betButton?.gameObject);
         AudioManager.Instance.PlayButtonClick();
         ShowBetPopup();
     }
 
     private void OnAutoBetClicked()
     {
-        AnimateButtonPress(_autoBetButton?.gameObject);
+        AnimateButton(_autoBetButton?.gameObject);
         AudioManager.Instance.PlayButtonClick();
         ShowAutoBetPopup();
     }
@@ -398,18 +343,11 @@ public class UIController : MonoBehaviour
         _currentSpeedMode = mode;
         UpdateSpeedButtonStates();
 
-        // Play appropriate speed button sound
         switch (mode)
         {
-            case SpeedMode.Normal:
-                AudioManager.Instance.PlayNormalSpeedClick();
-                break;
-            case SpeedMode.Turbo:
-                AudioManager.Instance.PlayTurboSpeedClick();
-                break;
-            case SpeedMode.Instant:
-                AudioManager.Instance.PlayInstantSpeedClick();
-                break;
+            case SpeedMode.Normal: AudioManager.Instance.PlayNormalSpeedClick(); break;
+            case SpeedMode.Turbo: AudioManager.Instance.PlayTurboSpeedClick(); break;
+            case SpeedMode.Instant: AudioManager.Instance.PlayInstantSpeedClick(); break;
         }
 
         GameEvents.TriggerSpeedModeChanged(mode);
@@ -434,40 +372,30 @@ public class UIController : MonoBehaviour
         AudioManager.Instance.PlayButtonClick();
         GameEvents.TriggerAutoBetRoundsChanged(_selectedAutoRounds);
         GameEvents.TriggerAutoPlayToggled(true);
-
         CloseAutoBetPopupAndStartGame();
     }
     #endregion
 
-    #region Event Handlers
+    #region Game State Handlers
     private void HandleGameStarted()
     {
-        // FIXED: Different behavior for autoplay vs normal play
         if (_isAutoPlayMode)
         {
-            // AUTOPLAY MODE: Hide play button, show pause button
-            if (_playButton != null)
-                _playButton.gameObject.SetActive(false);
-
-            if (_pauseButton != null)
-                _pauseButton.gameObject.SetActive(true);
+            _playButton?.gameObject.SetActive(false);
+            _pauseButton?.gameObject.SetActive(true);
         }
         else
         {
-            // NORMAL PLAY MODE: Keep play button visible but make it non-interactable
             if (_playButton != null)
             {
                 _playButton.gameObject.SetActive(true);
                 _playButton.interactable = false;
             }
-
-            if (_pauseButton != null)
-                _pauseButton.gameObject.SetActive(false);
+            _pauseButton?.gameObject.SetActive(false);
         }
 
         _mainControlContainer?.SetActive(false);
         _speedControlContainer?.SetActive(true);
-
         SetMainControlButtonsInteractable(false);
         UpdateAutoPlayRoundsDisplay();
     }
@@ -476,16 +404,12 @@ public class UIController : MonoBehaviour
     {
         if (!_isAutoPlayMode)
         {
-            // NORMAL PLAY MODE: Re-enable play button
             if (_playButton != null)
             {
                 _playButton.gameObject.SetActive(true);
                 _playButton.interactable = true;
             }
-
-            if (_pauseButton != null)
-                _pauseButton.gameObject.SetActive(false);
-
+            _pauseButton?.gameObject.SetActive(false);
             _mainControlContainer?.SetActive(true);
             _speedControlContainer?.SetActive(false);
         }
@@ -511,23 +435,16 @@ public class UIController : MonoBehaviour
 
         if (!isActive)
         {
-            // When autoplay stops, restore normal state
             if (_playButton != null)
             {
                 _playButton.gameObject.SetActive(true);
                 _playButton.interactable = true;
             }
-
-            if (_pauseButton != null)
-                _pauseButton.gameObject.SetActive(false);
-
+            _pauseButton?.gameObject.SetActive(false);
             _mainControlContainer?.SetActive(true);
             _speedControlContainer?.SetActive(false);
             SetMainControlButtonsInteractable(true);
-
-            if (_autoBetButtonSelected != null)
-                _autoBetButtonSelected.SetActive(false);
-
+            _autoBetButtonSelected?.SetActive(false);
             _remainingAutoRounds = 0;
             UpdateAutoPlayRoundsDisplay();
         }
@@ -537,14 +454,9 @@ public class UIController : MonoBehaviour
     #region Helper Methods
     private void SetMainControlButtonsInteractable(bool interactable)
     {
-        if (_clearButton != null)
-            _clearButton.interactable = interactable;
-
-        if (_betButton != null)
-            _betButton.interactable = interactable;
-
-        if (_autoBetButton != null)
-            _autoBetButton.interactable = interactable;
+        if (_clearButton != null) _clearButton.interactable = interactable;
+        if (_betButton != null) _betButton.interactable = interactable;
+        if (_autoBetButton != null) _autoBetButton.interactable = interactable;
     }
 
     private void UpdateAutoPlayRoundsDisplay()
@@ -565,101 +477,75 @@ public class UIController : MonoBehaviour
     }
     #endregion
 
-    #region NEW - Connection Popup Management
-    /// <summary>
-    /// Shows disconnection popup when connection is completely lost
-    /// </summary>
-    internal void DisconnectionPopup()
+    #region Connection Popup Management
+    internal void ShowPopup(GameObject popup, PopupPriority priority)
     {
-        OpenPopup(_disconnectPopupObject);
+        if (priority < _currentPopupPriority) return;
+
+        CloseAllConnectionPopups();
+
+        if (popup != null)
+        {
+            popup.SetActive(true);
+            _currentPopupPriority = priority;
+        }
+
+        _mainPopupObject?.SetActive(true);
     }
 
-    /// <summary>
-    /// Shows reconnection popup when connection is unstable (2 missed pongs)
-    /// </summary>
-    internal void ReconnectionPopup()
-    {
-        OpenPopup(_reconnectPopupObject);
-    }
-
-    /// <summary>
-    /// Closes all connection-related popups (called when connection restored)
-    /// </summary>
     internal void CheckAndClosePopups()
     {
-        if (_reconnectPopupObject != null && _reconnectPopupObject.activeInHierarchy)
-        {
-            ClosePopup(_reconnectPopupObject);
-        }
-
-        if (_disconnectPopupObject != null && _disconnectPopupObject.activeInHierarchy)
-        {
-            ClosePopup(_disconnectPopupObject);
-        }
+        CloseAllConnectionPopups();
+        _currentPopupPriority = PopupPriority.None;
     }
 
     private void HandleConnectionLost()
     {
         if (!IsQuitSelf)
-        {
-            DisconnectionPopup();
-        }
+            ShowPopup(_disconnectPopupObject, PopupPriority.Disconnect);
     }
 
-    private void ClosePopup(GameObject popup)
+    private void CloseAllConnectionPopups()
     {
-        if (popup) popup.SetActive(false);
+        if (_reconnectPopupObject != null && _reconnectPopupObject.gameObject != null)
+            _reconnectPopupObject.SetActive(false);
+        if (_disconnectPopupObject != null && _disconnectPopupObject.gameObject != null)
+            _disconnectPopupObject.SetActive(false);
+        if (_quitGameObject != null && _quitGameObject.gameObject != null)
+            _quitGameObject.SetActive(false);
 
-        // Only close main panel if no other popups are showing
-        if (_disconnectPopupObject != null && _reconnectPopupObject != null &&
-            !_disconnectPopupObject.activeSelf && !_reconnectPopupObject.activeSelf)
+        bool allClosed = (_reconnectPopupObject == null || !_reconnectPopupObject.activeSelf) &&
+                         (_disconnectPopupObject == null || !_disconnectPopupObject.activeSelf) &&
+                         (_quitGameObject == null || !_quitGameObject.activeSelf);
+
+        if (allClosed && _mainPopupObject != null && _mainPopupObject.gameObject != null)
         {
-            if (_mainPopupObject) _mainPopupObject.SetActive(false);
+            _mainPopupObject.SetActive(false);
         }
-    }
-
-    private void OpenPopup(GameObject popup)
-    {
-        if (popup) popup.SetActive(true);
-        if (_mainPopupObject) _mainPopupObject.SetActive(true);
     }
     #endregion
 
-    #region NEW - Quit Game Management
-    /// <summary>
-    /// Opens the quit game confirmation popup
-    /// </summary>
+    #region Quit Game Management
     private void OpenQuitGamePopup()
     {
         AudioManager.Instance?.PlayButtonClick();
-        OpenPopup(_quitGameObject);
+        ShowPopup(_quitGameObject, PopupPriority.Quit);
     }
 
-    /// <summary>
-    /// Closes the quit game popup without quitting
-    /// </summary>
     private void CloseQuitGamePopup()
     {
         AudioManager.Instance?.PlayButtonClick();
-        ClosePopup(_quitGameObject);
+        _quitGameObject?.SetActive(false);
+        _currentPopupPriority = PopupPriority.None;
+        CheckAndClosePopups();
     }
 
-    /// <summary>
-    /// User confirmed quit - close socket and exit game
-    /// CRITICAL: Sets IsQuitSelf = true before calling CloseSocket
-    /// </summary>
     private void QuitGame()
     {
-        IsQuitSelf = true;  // CRITICAL: Mark as user-initiated quit
+        IsQuitSelf = true;
         AudioManager.Instance?.PlayButtonClick();
-
-        ClosePopup(_quitGameObject);
-
-        // Call GameController's CloseSocket method
-        if (GameController.Instance != null)
-        {
-            GameController.Instance.CloseSocket();
-        }
+        CloseQuitGamePopup();
+        GameController.Instance?.CloseSocket();
     }
     #endregion
 
@@ -668,7 +554,6 @@ public class UIController : MonoBehaviour
     {
         if (_winPopupCoroutine != null)
             StopCoroutine(_winPopupCoroutine);
-
         _winPopupCoroutine = StartCoroutine(DisplayWinPopup(winAmount));
     }
 
@@ -693,9 +578,7 @@ public class UIController : MonoBehaviour
 
         if (_winPopupArea != null)
         {
-            AnimatePopupHide(_winPopupArea, () => {
-                _winPopupMainPanel?.SetActive(false);
-            });
+            AnimatePopupHide(_winPopupArea, () => _winPopupMainPanel?.SetActive(false));
         }
         else
         {
@@ -706,73 +589,58 @@ public class UIController : MonoBehaviour
     }
     #endregion
 
-    #region Popups
+    #region Bet/Auto Popups
     private void ShowBetPopup()
     {
         _betPopupMainPanel?.SetActive(true);
-
         if (_betPopupArea != null)
         {
             _betPopupArea.SetActive(true);
             UpdateBetButtons();
             AnimatePopupShow(_betPopupArea);
         }
-
-        if (_betButtonSelected != null)
-            _betButtonSelected.SetActive(true);
+        _betButtonSelected?.SetActive(true);
     }
 
     private void CloseBetPopup()
     {
         AudioManager.Instance.PlayButtonClick();
-
         if (_betPopupArea != null)
         {
-            AnimatePopupHide(_betPopupArea, () => {
-                _betPopupMainPanel?.SetActive(false);
-            });
+            AnimatePopupHide(_betPopupArea, () => _betPopupMainPanel?.SetActive(false));
         }
         else
         {
             _betPopupMainPanel?.SetActive(false);
         }
-
-        if (_betButtonSelected != null)
-            _betButtonSelected.SetActive(false);
+        _betButtonSelected?.SetActive(false);
     }
 
     private void ShowAutoBetPopup()
     {
         _autoBetPopupMainPanel?.SetActive(true);
-
         if (_autoBetPopupArea != null)
         {
             _autoBetPopupArea.SetActive(true);
             UpdateAutoRoundButtons();
             AnimatePopupShow(_autoBetPopupArea);
         }
-
-        if (_autoBetButtonSelected != null)
-            _autoBetButtonSelected.SetActive(true);
+        _autoBetButtonSelected?.SetActive(true);
     }
 
     private void CloseAutoBetPopup()
     {
         AudioManager.Instance.PlayButtonClick();
-
         if (_autoBetPopupArea != null)
         {
-            AnimatePopupHide(_autoBetPopupArea, () => {
-                _autoBetPopupMainPanel?.SetActive(false);
-            });
+            AnimatePopupHide(_autoBetPopupArea, () => _autoBetPopupMainPanel?.SetActive(false));
         }
         else
         {
             _autoBetPopupMainPanel?.SetActive(false);
         }
-
-        if (!_isAutoPlayMode && _autoBetButtonSelected != null)
-            _autoBetButtonSelected.SetActive(false);
+        if (!_isAutoPlayMode)
+            _autoBetButtonSelected?.SetActive(false);
     }
 
     private void CloseAutoBetPopupAndStartGame()
@@ -793,9 +661,7 @@ public class UIController : MonoBehaviour
 
     private void UpdateBetButtons()
     {
-        if (GameController.Instance == null || GameController.Instance.GetModel() == null)
-            return;
-
+        if (GameController.Instance == null || GameController.Instance.GetModel() == null) return;
         float[] bets = GameController.Instance.GetModel().InitData.bets;
 
         for (int i = 0; i < _betButtons.Length && i < bets.Length; i++)
@@ -877,33 +743,23 @@ public class UIController : MonoBehaviour
     }
     #endregion
 
-    #region Animations - OPTIMIZED
-    private void AnimateButtonPress(GameObject button)
+    #region Animations
+    private void AnimateButton(GameObject button)
     {
         if (button == null) return;
-
         button.transform.DOKill(true);
         button.transform.localScale = Vector3.one;
-
         Tween punchTween = button.transform.DOPunchScale(Vector3.one * 0.1f, GameConfig.BUTTON_SCALE_DURATION, 1, 0.5f)
-            .SetUpdate(true)
-            .SetRecyclable(true);
-
+            .SetUpdate(true).SetRecyclable(true);
         punchTween.OnComplete(() => punchTween.Kill());
     }
 
     private void AnimatePopupShow(GameObject popup)
     {
         if (popup == null) return;
-
         popup.transform.DOKill(true);
         popup.transform.localScale = Vector3.zero;
-
-        Tween scaleTween = popup.transform.DOScale(Vector3.one, 0.3f)
-            .SetEase(Ease.OutBack)
-            .SetUpdate(true)
-            .SetRecyclable(true);
-
+        Tween scaleTween = popup.transform.DOScale(Vector3.one, 0.3f).SetEase(Ease.OutBack).SetUpdate(true).SetRecyclable(true);
         scaleTween.OnComplete(() => scaleTween.Kill());
     }
 
@@ -914,14 +770,8 @@ public class UIController : MonoBehaviour
             onComplete?.Invoke();
             return;
         }
-
         popup.transform.DOKill(true);
-
-        Tween scaleTween = popup.transform.DOScale(Vector3.zero, 0.2f)
-            .SetEase(Ease.InBack)
-            .SetUpdate(true)
-            .SetRecyclable(true);
-
+        Tween scaleTween = popup.transform.DOScale(Vector3.zero, 0.2f).SetEase(Ease.InBack).SetUpdate(true).SetRecyclable(true);
         scaleTween.OnComplete(() => {
             popup.SetActive(false);
             onComplete?.Invoke();
@@ -932,38 +782,24 @@ public class UIController : MonoBehaviour
     private void AnimateWinText()
     {
         if (_winAmountText == null) return;
-
         _winAmountText.transform.DOKill(true);
-
-        Tween punchTween = _winAmountText.transform.DOPunchScale(Vector3.one * 0.3f, 0.5f, 5, 0.5f)
-            .SetUpdate(true)
-            .SetRecyclable(true);
-
+        Tween punchTween = _winAmountText.transform.DOPunchScale(Vector3.one * 0.3f, 0.5f, 5, 0.5f).SetUpdate(true).SetRecyclable(true);
         punchTween.OnComplete(() => punchTween.Kill());
     }
 
     private void UpdateSpeedButtonStates()
     {
-        // Normal
-        if (_normalSpeedSelected != null)
-            _normalSpeedSelected.SetActive(_currentSpeedMode == SpeedMode.Normal);
+        _normalSpeedSelected?.SetActive(_currentSpeedMode == SpeedMode.Normal);
         UpdateSpeedButtonTextColor(_normalSpeedButton, _currentSpeedMode == SpeedMode.Normal);
-
-        // Turbo
-        if (_turboSpeedSelected != null)
-            _turboSpeedSelected.SetActive(_currentSpeedMode == SpeedMode.Turbo);
+        _turboSpeedSelected?.SetActive(_currentSpeedMode == SpeedMode.Turbo);
         UpdateSpeedButtonTextColor(_turboSpeedButton, _currentSpeedMode == SpeedMode.Turbo);
-
-        // Instant
-        if (_instantSpeedSelected != null)
-            _instantSpeedSelected.SetActive(_currentSpeedMode == SpeedMode.Instant);
+        _instantSpeedSelected?.SetActive(_currentSpeedMode == SpeedMode.Instant);
         UpdateSpeedButtonTextColor(_instantSpeedButton, _currentSpeedMode == SpeedMode.Instant);
     }
 
     private void UpdateSpeedButtonTextColor(Button button, bool isSelected)
     {
         if (button == null) return;
-
         TextMeshProUGUI buttonText = button.GetComponentInChildren<TextMeshProUGUI>();
         if (buttonText != null)
             buttonText.color = isSelected ? _speedSelectedColor : _speedNormalColor;
@@ -971,32 +807,23 @@ public class UIController : MonoBehaviour
 
     private void CleanupAnimations()
     {
-        if (_playButton != null)
+        if (_playButton != null && _playButton.transform != null)
             _playButton.transform.DOKill(true);
-
-        if (_pauseButton != null)
+        if (_pauseButton != null && _pauseButton.transform != null)
             _pauseButton.transform.DOKill(true);
-
-        if (_betPopupArea != null)
+        if (_betPopupArea != null && _betPopupArea.transform != null)
             _betPopupArea.transform.DOKill(true);
-
-        if (_autoBetPopupArea != null)
+        if (_autoBetPopupArea != null && _autoBetPopupArea.transform != null)
             _autoBetPopupArea.transform.DOKill(true);
-
-        if (_winPopupArea != null)
+        if (_winPopupArea != null && _winPopupArea.transform != null)
             _winPopupArea.transform.DOKill(true);
-
-        if (_winAmountText != null)
+        if (_winAmountText != null && _winAmountText.transform != null)
             _winAmountText.transform.DOKill(true);
-
-        // NEW: Cleanup connection popup animations
-        if (_reconnectPopupObject != null)
+        if (_reconnectPopupObject != null && _reconnectPopupObject.transform != null)
             _reconnectPopupObject.transform.DOKill(true);
-
-        if (_disconnectPopupObject != null)
+        if (_disconnectPopupObject != null && _disconnectPopupObject.transform != null)
             _disconnectPopupObject.transform.DOKill(true);
-
-        if (_quitGameObject != null)
+        if (_quitGameObject != null && _quitGameObject.transform != null)
             _quitGameObject.transform.DOKill(true);
     }
     #endregion

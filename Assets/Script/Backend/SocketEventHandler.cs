@@ -29,7 +29,8 @@ public class SocketEventHandler
                 draws = response.gameData.draws,
                 maximumPicks = response.gameData.maximumPicks,
                 bets = _availableBets,
-                paytable = ConvertDoublePaytableToFloat(response.gameData.paytable)
+                paytable = ConvertDoublePaytableToFloat(response.gameData.paytable),
+                initialBalance = response.player != null ? (float)response.player.balance : 0f
             };
 
             Debug.Log("=== PARSED INIT DATA ===");
@@ -38,7 +39,7 @@ public class SocketEventHandler
             Debug.Log($"Draws Per Game: {initData.draws}");
             Debug.Log($"Max Picks: {initData.maximumPicks}");
             Debug.Log($"Available Bets: {string.Join(", ", System.Array.ConvertAll(initData.bets, b => $"${b:F2}"))}");
-            Debug.Log($"Initial Balance: ${response.player.balance:F3}");
+            Debug.Log($"Initial Balance: ${initData.initialBalance:F3}");
             Debug.Log("========================");
 
             return initData;
@@ -58,27 +59,9 @@ public class SocketEventHandler
         {
             ServerResultResponse response = JsonConvert.DeserializeObject<ServerResultResponse>(json);
 
-            if (response == null)
+            if (response == null || response.payload == null || response.player == null || !response.success)
             {
-                Debug.LogError("Result response is null");
-                return null;
-            }
-
-            if (response.payload == null)
-            {
-                Debug.LogError("Result payload is null");
-                return null;
-            }
-
-            if (response.player == null)
-            {
-                Debug.LogError("Result player data is null");
-                return null;
-            }
-
-            if (!response.success)
-            {
-                Debug.LogError("Server returned success=false");
+                Debug.LogError("Invalid result data");
                 return null;
             }
 
@@ -169,4 +152,4 @@ public class SocketEventHandler
 
         return floatPaytable;
     }
-}       
+}

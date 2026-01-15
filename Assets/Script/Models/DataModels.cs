@@ -2,7 +2,7 @@
 using System.Collections.Generic;
 using UnityEngine;
 
-#region Game Data Models (Existing - No Changes)
+#region Game Data Models
 
 [Serializable]
 public class GameInitData
@@ -14,6 +14,7 @@ public class GameInitData
     public int maximumPicks = 15;
     public float[] bets;
     public float[][] paytable;
+    public float initialBalance;
 }
 
 [Serializable]
@@ -77,103 +78,70 @@ public class PaytableEntry
 
 #endregion
 
-#region Server Data Models - EXACT MATCH TO PRODUCTION SERVER
+#region Server Data Models
 
-/// <summary>
-/// Server init response structure
-/// Event: "game:init"
-/// Verified from production logs
-/// </summary>
 [Serializable]
 public class ServerInitResponse
 {
-    public string id;                    // "initData"
+    public string id;
     public ServerGameData gameData;
     public ServerUIData uiData;
     public ServerPlayer player;
 }
 
-/// <summary>
-/// Game configuration from server
-/// </summary>
 [Serializable]
 public class ServerGameData
 {
-    public int total;              // 80 - total numbers available
-    public bool isSpecial;         // false
-    public int draws;              // 20 - numbers drawn per game
-    public int maximumPicks;       // 10 - max numbers player can select
-    public List<double> bets;      // Available bet amounts
-    public List<List<double>> paytable;  // Payout multipliers
+    public int total;
+    public bool isSpecial;
+    public int draws;
+    public int maximumPicks;
+    public List<double> bets;
+    public List<List<double>> paytable;
 }
 
-/// <summary>
-/// UI data from server (optional)
-/// </summary>
 [Serializable]
 public class ServerUIData
 {
-    public string description;     // Game instructions
+    public string description;
 }
 
-/// <summary>
-/// Player data from server
-/// Note: Only contains balance in production responses
-/// </summary>
 [Serializable]
 public class ServerPlayer
 {
-    public double balance;         // Current player balance
+    public double balance;
 }
 
-/// <summary>
-/// Server result response structure
-/// Event: "result"
-/// Verified from production logs
-/// IMPORTANT: Contains "success" field at root level
-/// </summary>
 [Serializable]
 public class ServerResultResponse
 {
-    public bool success;                 // ⚠️ Server success flag
-    public string id;                    // "ResultData"
+    public bool success;
+    public string id;
     public ServerResultPayload payload;
     public ServerPlayer player;
 }
 
-/// <summary>
-/// Result payload from server
-/// CRITICAL: Server uses "currenWinning" (typo - missing 't')
-/// This MUST match exactly or deserialization will fail silently
-/// </summary>
 [Serializable]
 public class ServerResultPayload
 {
-    public double currenWinning;   // ⚠️ TYPO IN SERVER - Keep as is!
-    public double totalBet;        // Bet amount for this round
-    public List<int> hits;         // Player's numbers that were drawn
-    public List<int> drawn;        // All 20 numbers drawn
+    public double currenWinning;
+    public double totalBet;
+    public List<int> hits;
+    public List<int> drawn;
 }
 
-/// <summary>
-/// Draw request structure (Unity → Server)
-/// Event: "request"
-/// </summary>
 [Serializable]
 public class DrawRequest
 {
-    public string type;                  // "DRAW"
+    public string type;
     public DrawRequestPayload payload;
 }
 
-/// <summary>
-/// Draw request payload
-/// </summary>
 [Serializable]
 public class DrawRequestPayload
 {
-    public int betIndex;           // Index of selected bet (0-based)
-    public List<int> picks;        // Player's selected numbers
+    public int betIndex;
+    public List<int> picks;
 }
 
 #endregion

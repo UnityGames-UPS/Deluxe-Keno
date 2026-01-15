@@ -1,12 +1,6 @@
 using UnityEngine;
 using System.Collections.Generic;
 
-/// <summary>
-/// Optimized Audio Manager with pooling and volume control
-/// Supports separate controls for SFX and Background Music
-/// FIXED: Proper cleanup to prevent MissingReferenceException
-/// NEW: Added scroll sound effects (button click and drag)
-/// </summary>
 public class AudioManager : MonoBehaviour
 {
     #region Singleton
@@ -38,10 +32,8 @@ public class AudioManager : MonoBehaviour
     [SerializeField] private AudioClip _playButtonSound;
     [SerializeField] private AudioClip _winBallSound;
     [SerializeField] private AudioClip _winPopupSound;
-
-    [Header("Scroll Sounds")]
-    [SerializeField] private AudioClip _scrollButtonSound;  // NEW: Plays once when using left/right buttons
-    [SerializeField] private AudioClip _scrollDragSound;    // NEW: Plays continuously while dragging
+    [SerializeField] private AudioClip _scrollButtonSound;
+    [SerializeField] private AudioClip _scrollDragSound;
 
     [Header("Background Music")]
     [SerializeField] private AudioClip _mainBGMusic;
@@ -73,7 +65,6 @@ public class AudioManager : MonoBehaviour
     private const int INITIAL_POOL_SIZE = 5;
     #endregion
 
-    // FIXED: Track if we're being destroyed
     private bool _isBeingDestroyed = false;
 
     private void Awake()
@@ -123,7 +114,6 @@ public class AudioManager : MonoBehaviour
         _musicEnabled = PlayerPrefs.GetInt(PREF_MUSIC_ENABLED, 1) == 1;
         _sfxVolume = PlayerPrefs.GetFloat(PREF_SFX_VOLUME, 1f);
         _musicVolume = PlayerPrefs.GetFloat(PREF_MUSIC_VOLUME, 0.5f);
-
         ApplySettings();
     }
 
@@ -153,9 +143,7 @@ public class AudioManager : MonoBehaviour
     #region Public Audio Controls
     public void PlayBackgroundMusic()
     {
-        if (_isBeingDestroyed || _bgMusicSource == null || !_musicEnabled || _mainBGMusic == null)
-            return;
-
+        if (_isBeingDestroyed || _bgMusicSource == null || !_musicEnabled || _mainBGMusic == null) return;
         _bgMusicSource.clip = _mainBGMusic;
         _bgMusicSource.volume = _musicVolume;
         _bgMusicSource.Play();
@@ -163,19 +151,13 @@ public class AudioManager : MonoBehaviour
 
     public void StopBackgroundMusic()
     {
-        // FIXED: Check if source still exists before trying to stop
-        if (_isBeingDestroyed || _bgMusicSource == null)
-            return;
-
+        if (_isBeingDestroyed || _bgMusicSource == null) return;
         try
         {
             if (_bgMusicSource != null)
                 _bgMusicSource.Stop();
         }
-        catch (MissingReferenceException)
-        {
-            // AudioSource was already destroyed, ignore
-        }
+        catch (MissingReferenceException) { }
     }
 
     public void PlayBallFalling() => PlaySFX(_ballFallingSound);
@@ -188,16 +170,12 @@ public class AudioManager : MonoBehaviour
     public void PlayPlayButton() => PlaySFX(_playButtonSound);
     public void PlayWinBall() => PlaySFX(_winBallSound);
     public void PlayWinPopup() => PlaySFX(_winPopupSound);
-
-    // NEW: Scroll sound methods
     public void PlayScrollButton() => PlaySFX(_scrollButtonSound);
     public void PlayScrollDrag() => PlaySFX(_scrollDragSound);
 
     private void PlaySFX(AudioClip clip)
     {
-        if (_isBeingDestroyed || !_sfxEnabled || clip == null)
-            return;
-
+        if (_isBeingDestroyed || !_sfxEnabled || clip == null) return;
         AudioSource source = GetPooledAudioSource();
         if (source != null)
         {
@@ -209,17 +187,14 @@ public class AudioManager : MonoBehaviour
 
     private AudioSource GetPooledAudioSource()
     {
-        if (_isBeingDestroyed)
-            return null;
+        if (_isBeingDestroyed) return null;
 
-        // Find available source
         foreach (AudioSource source in _sfxPool)
         {
             if (source != null && !source.isPlaying)
                 return source;
         }
 
-        // Create new source if pool exhausted
         if (gameObject != null)
         {
             AudioSource newSource = gameObject.AddComponent<AudioSource>();
@@ -268,29 +243,24 @@ public class AudioManager : MonoBehaviour
     #region Cleanup
     private void OnDestroy()
     {
-        // FIXED: Mark as being destroyed first
         _isBeingDestroyed = true;
 
         if (_instance == this)
         {
-            // Stop music safely
             StopBackgroundMusic();
 
-            // Clean up pool references
             if (_sfxPool != null)
             {
                 _sfxPool.Clear();
                 _sfxPool = null;
             }
 
-            // Clear references
             _bgMusicSource = null;
             _sfxSource = null;
             _instance = null;
         }
     }
 
-    // FIXED: Also handle when application quits
     private void OnApplicationQuit()
     {
         _isBeingDestroyed = true;

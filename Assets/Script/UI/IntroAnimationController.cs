@@ -2,7 +2,6 @@ using UnityEngine;
 using DG.Tweening;
 using System.Collections;
 
-
 public class IntroAnimationController : MonoBehaviour
 {
     [Header("Animation Elements")]
@@ -56,16 +55,12 @@ public class IntroAnimationController : MonoBehaviour
             _currentSequence = null;
         }
 
-        if (_mainArea != null)
-            _mainArea.DOKill(true);
-
-        if (_textTransform != null)
-            _textTransform.DOKill(true);
+        if (_mainArea != null) _mainArea.DOKill(true);
+        if (_textTransform != null) _textTransform.DOKill(true);
 
         foreach (var ball in _balls)
         {
-            if (ball != null)
-                ball.DOKill(true);
+            if (ball != null) ball.DOKill(true);
         }
     }
 
@@ -140,15 +135,10 @@ public class IntroAnimationController : MonoBehaviour
         _hasPlayedOnce = true;
 
         GameEvents.TriggerIntroAnimationStarted();
-
-        // FIXED: Start animation immediately, then play audio with a slight delay to sync
         StartCoroutine(PlayAudioAfterDelay(_audioDelayToMatchAnimation));
 
-        _currentSequence = DOTween.Sequence()
-            .SetRecyclable(true)
-            .SetUpdate(true);
+        _currentSequence = DOTween.Sequence().SetRecyclable(true).SetUpdate(true);
 
-        // Main area drop - STARTS IMMEDIATELY
         if (_mainArea != null)
         {
             _currentSequence.Append(_mainArea.DOAnchorPos(_mainAreaOriginalPos, _mainAreaDropDuration).SetEase(Ease.OutBounce));
@@ -156,20 +146,15 @@ public class IntroAnimationController : MonoBehaviour
             _currentSequence.Append(_mainArea.DOScale(1f, 0.15f).SetEase(Ease.InQuad));
         }
 
-        // Balls drop
         for (int i = 0; i < _balls.Length; i++)
         {
             if (_balls[i] != null)
             {
                 Vector3 finalPos = _ballsOriginalPos[i];
-                _currentSequence.Insert(
-                    _mainAreaDropDuration + (i * _ballDropDelay),
-                    _balls[i].DOLocalMove(finalPos, _ballDropDuration).SetEase(Ease.OutBounce)
-                );
+                _currentSequence.Insert(_mainAreaDropDuration + (i * _ballDropDelay), _balls[i].DOLocalMove(finalPos, _ballDropDuration).SetEase(Ease.OutBounce));
             }
         }
 
-        // Text animation
         float textStartTime = _mainAreaDropDuration + (_balls.Length * _ballDropDelay) + _ballDropDuration + 0.1f;
 
         if (_textTransform != null)
@@ -187,7 +172,6 @@ public class IntroAnimationController : MonoBehaviour
         });
     }
 
-    // FIXED: Play audio with delay to match animation perfectly
     private IEnumerator PlayAudioAfterDelay(float delay)
     {
         yield return new WaitForSeconds(delay);
@@ -202,7 +186,6 @@ public class IntroAnimationController : MonoBehaviour
         if (_introMainPanel != null && _introMainPanel.gameObject.activeSelf)
         {
             HideIntroPanel();
-
             if (_ballContainer != null)
                 _ballContainer.SetActive(true);
         }
@@ -220,11 +203,7 @@ public class IntroAnimationController : MonoBehaviour
 
         if (_introMainPanel != null)
         {
-            Tween hideTween = _introMainPanel.DOScale(0f, 0.2f)
-                .SetEase(Ease.InBack)
-                .SetUpdate(true)
-                .SetRecyclable(true);
-
+            Tween hideTween = _introMainPanel.DOScale(0f, 0.2f).SetEase(Ease.InBack).SetUpdate(true).SetRecyclable(true);
             hideTween.OnComplete(() => {
                 _introMainPanel.gameObject.SetActive(false);
                 GameEvents.TriggerIntroAnimationCompleted();

@@ -26,7 +26,7 @@ public class GameModel
     public void Initialize(GameInitData initData)
     {
         _initData = initData;
-        _playerData.balance = 998.775f;
+        _playerData.balance = initData.initialBalance;
         _playerData.currentBet = initData.bets?[0] ?? 0.2f;
     }
 

@@ -5,7 +5,6 @@ using UnityEngine.UI;
 using TMPro;
 using DG.Tweening;
 
-
 public class BallAnimationView : MonoBehaviour
 {
     [System.Serializable]
@@ -48,10 +47,8 @@ public class BallAnimationView : MonoBehaviour
     private bool _speedModeChangeRequested;
     private bool _isIntroActive;
 
-    // Optimization: Cached HashSet for faster lookup
     private HashSet<int> _winningNumbersSet = new HashSet<int>();
 
-    // CONVERTED TO LOCAL SPACE: Cache local positions of reference points
     private Vector3 _startPointLocal;
     private Vector3 _centerPointLocal;
     private Vector3 _endPointLocal;
@@ -62,8 +59,6 @@ public class BallAnimationView : MonoBehaviour
         SubscribeToEvents();
         CacheLocalReferencePoints();
         HideAllBalls();
-
-        // FIXED: Recache positions when orientation changes
         StartCoroutine(MonitorOrientationChanges());
     }
 
@@ -72,7 +67,6 @@ public class BallAnimationView : MonoBehaviour
         Cleanup();
     }
 
-    // NEW: Monitor orientation changes and recache reference points
     private IEnumerator MonitorOrientationChanges()
     {
         ScreenOrientation lastOrientation = Screen.orientation;
@@ -84,53 +78,31 @@ public class BallAnimationView : MonoBehaviour
             if (Screen.orientation != lastOrientation)
             {
                 lastOrientation = Screen.orientation;
-                Debug.Log($"BallAnimationView: Orientation changed to {lastOrientation}, recaching reference points");
-
-                // Recache positions for new orientation
                 CacheLocalReferencePoints();
             }
         }
     }
 
-    // NEW: Convert world space reference points to local space (relative to parent)
     private void CacheLocalReferencePoints()
     {
-        if (_startPoint == null || _centerPoint == null || _endPoint == null)
-        {
-            Debug.LogError("BallAnimationView: Reference points not assigned!");
-            return;
-        }
+        if (_startPoint == null || _centerPoint == null || _endPoint == null) return;
 
-        // Determine the common parent for all animation elements
-        // Use the parent of the ball objects themselves for correct local space
         if (_balls.Count > 0 && _balls[0].ballObject != null)
-        {
             _animationParent = _balls[0].ballObject.transform.parent;
-        }
         else
-        {
             _animationParent = _startPoint.parent;
-        }
 
         if (_animationParent == null)
         {
-            Debug.LogWarning("BallAnimationView: No parent found, using world space");
             _startPointLocal = _startPoint.position;
             _centerPointLocal = _centerPoint.position;
             _endPointLocal = _endPoint.position;
         }
         else
         {
-            // Convert world positions to local positions relative to the animation parent
             _startPointLocal = _animationParent.InverseTransformPoint(_startPoint.position);
             _centerPointLocal = _animationParent.InverseTransformPoint(_centerPoint.position);
             _endPointLocal = _animationParent.InverseTransformPoint(_endPoint.position);
-
-            Debug.Log($"BallAnimationView: Cached local positions\n" +
-                $"Start: {_startPointLocal}\n" +
-                $"Center: {_centerPointLocal}\n" +
-                $"End: {_endPointLocal}\n" +
-                $"Parent: {_animationParent.name}");
         }
     }
 
@@ -139,8 +111,8 @@ public class BallAnimationView : MonoBehaviour
         GameEvents.OnGameResultReceived += HandleGameResult;
         GameEvents.OnGameStarted += HandleGameStarted;
         GameEvents.OnSpeedModeChanged += HandleSpeedModeChanged;
-        GameEvents.OnIntroAnimationStarted += HandleIntroStarted;
-        GameEvents.OnIntroAnimationCompleted += HandleIntroCompleted;
+        GameEvents.OnIntroAnimationStarted += () => { _isIntroActive = true; HideAllBalls(); };
+        GameEvents.OnIntroAnimationCompleted += () => _isIntroActive = false;
     }
 
     private void UnsubscribeFromEvents()
@@ -148,25 +120,11 @@ public class BallAnimationView : MonoBehaviour
         GameEvents.OnGameResultReceived -= HandleGameResult;
         GameEvents.OnGameStarted -= HandleGameStarted;
         GameEvents.OnSpeedModeChanged -= HandleSpeedModeChanged;
-        GameEvents.OnIntroAnimationStarted -= HandleIntroStarted;
-        GameEvents.OnIntroAnimationCompleted -= HandleIntroCompleted;
-    }
-
-    private void HandleIntroStarted()
-    {
-        _isIntroActive = true;
-        HideAllBalls();
-    }
-
-    private void HandleIntroCompleted()
-    {
-        _isIntroActive = false;
     }
 
     private void HandleGameStarted()
     {
         if (_isIntroActive) return;
-
         StopCurrentAnimation();
         HideAllBalls();
         ResetState();
@@ -181,7 +139,6 @@ public class BallAnimationView : MonoBehaviour
         _isAnimating = true;
         _speedModeChangeRequested = false;
 
-        // Optimization: Build HashSet once for O(1) lookups
         _winningNumbersSet.Clear();
         foreach (int hit in result.hits)
             _winningNumbersSet.Add(hit);
@@ -196,9 +153,7 @@ public class BallAnimationView : MonoBehaviour
         DOTween.timeScale = GetSpeedMultiplier();
 
         if (_isAnimating && _currentResult != null && !_speedModeChangeRequested)
-        {
             _speedModeChangeRequested = true;
-        }
     }
 
     private IEnumerator AnimateDrawSequence(GameResultData result, int startIndex = 0)
@@ -206,13 +161,9 @@ public class BallAnimationView : MonoBehaviour
         _speedModeChangeRequested = false;
 
         if (_currentSpeedMode == SpeedMode.Instant)
-        {
             yield return AnimateInstantMode(result, startIndex);
-        }
         else
-        {
             yield return AnimateNormalMode(result, startIndex);
-        }
 
         CompleteAnimation(result);
     }
@@ -226,8 +177,6 @@ public class BallAnimationView : MonoBehaviour
             bool isWin = _winningNumbersSet.Contains(number);
 
             AudioManager.Instance.PlayBallFalling();
-
-            // Fire and forget - no waiting
             StartCoroutine(AnimateSingleBallAsync(i, number, isWin));
             GameEvents.TriggerBallDrawn(number, isWin);
 
@@ -262,19 +211,11 @@ public class BallAnimationView : MonoBehaviour
 
             AudioManager.Instance.PlayBallFalling();
 
-            // Vertical fall - using LOCAL space
             yield return AnimateVerticalFallLocal(ball, finalPosLocal);
-
-            // Horizontal roll - using LOCAL space
             yield return AnimateHorizontalRollLocal(ball, finalPosLocal);
-
-            // Bounce - using LOCAL space
             yield return AnimateBounceLocal(ball, finalPosLocal);
-
-            // Settle
             yield return AnimateSettle(ball);
 
-            // Win effect
             if (isWin)
             {
                 AnimateWinEffect(ball);
@@ -323,16 +264,12 @@ public class BallAnimationView : MonoBehaviour
     private void PrepareBall(BallData ball, int number)
     {
         ball.ballObject.SetActive(true);
-
-        // Set position in LOCAL space
         ball.ballObject.transform.localPosition = _startPointLocal;
-        // FIXED: Use local rotation instead of world rotation for orientation independence
         ball.ballObject.transform.localRotation = Quaternion.identity;
 
         if (ball.numberText != null)
         {
             ball.numberText.text = number.ToString();
-            // FIXED: Ensure text is also using local rotation (relative to ball)
             ball.numberText.transform.localRotation = Quaternion.identity;
         }
 
@@ -340,17 +277,13 @@ public class BallAnimationView : MonoBehaviour
             ball.winImage.SetActive(false);
     }
 
-    // CONVERTED: Vertical fall animation using LOCAL space
     private IEnumerator AnimateVerticalFallLocal(BallData ball, Vector3 finalPosLocal)
     {
         float vertDist = Vector3.Distance(_startPointLocal, _centerPointLocal);
         float vertRotations = vertDist / (_ballRadius * 2f * Mathf.PI);
         float vertRotation = -(vertRotations * 360f);
 
-        Sequence vertSeq = DOTween.Sequence()
-            .SetRecyclable(true)
-            .SetUpdate(true);
-
+        Sequence vertSeq = DOTween.Sequence().SetRecyclable(true).SetUpdate(true);
         vertSeq.Append(ball.ballObject.transform.DOLocalMove(_centerPointLocal, _verticalFallDuration).SetEase(Ease.InQuad));
         vertSeq.Join(ball.ballObject.transform.DORotate(new Vector3(0, 0, vertRotation), _verticalFallDuration, RotateMode.FastBeyond360).SetEase(Ease.Linear));
 
@@ -358,7 +291,6 @@ public class BallAnimationView : MonoBehaviour
         vertSeq.Kill();
     }
 
-    // CONVERTED: Horizontal roll animation using LOCAL space
     private IEnumerator AnimateHorizontalRollLocal(BallData ball, Vector3 finalPosLocal)
     {
         float horzDist = Vector3.Distance(_centerPointLocal, finalPosLocal);
@@ -372,10 +304,7 @@ public class BallAnimationView : MonoBehaviour
         float adjustment = afterRoll <= 180f ? -afterRoll : 360f - afterRoll;
         float finalRotation = currentRotation + naturalRoll + adjustment;
 
-        Sequence horzSeq = DOTween.Sequence()
-            .SetRecyclable(true)
-            .SetUpdate(true);
-
+        Sequence horzSeq = DOTween.Sequence().SetRecyclable(true).SetUpdate(true);
         horzSeq.Append(ball.ballObject.transform.DOLocalMove(finalPosLocal, _horizontalRollDuration).SetEase(Ease.OutQuad));
         horzSeq.Join(ball.ballObject.transform.DORotate(new Vector3(0, 0, finalRotation), _horizontalRollDuration, RotateMode.FastBeyond360).SetEase(Ease.Linear));
 
@@ -383,7 +312,6 @@ public class BallAnimationView : MonoBehaviour
         horzSeq.Kill();
     }
 
-    // CONVERTED: Bounce animation using LOCAL space
     private IEnumerator AnimateBounceLocal(BallData ball, Vector3 finalPosLocal)
     {
         Vector3 bounceDir = (_centerPointLocal - _endPointLocal).normalized;
@@ -391,10 +319,7 @@ public class BallAnimationView : MonoBehaviour
         Vector3 bouncePosLocal = finalPosLocal + bounceDir * _bounceAmount;
         bouncePosLocal.y = finalPosLocal.y;
 
-        Sequence bounceSeq = DOTween.Sequence()
-            .SetRecyclable(true)
-            .SetUpdate(true);
-
+        Sequence bounceSeq = DOTween.Sequence().SetRecyclable(true).SetUpdate(true);
         bounceSeq.Append(ball.ballObject.transform.DOLocalMove(bouncePosLocal, _bounceDuration * 0.5f).SetEase(Ease.OutQuad));
         bounceSeq.Append(ball.ballObject.transform.DOLocalMove(finalPosLocal, _bounceDuration * 0.5f).SetEase(Ease.InOutQuad));
 
@@ -405,12 +330,7 @@ public class BallAnimationView : MonoBehaviour
     private IEnumerator AnimateSettle(BallData ball)
     {
         float tilt = Random.Range(-3f, 3f);
-        // FIXED: Use local rotation for orientation independence
-        Tween settleTween = ball.ballObject.transform.DOLocalRotate(new Vector3(0, 0, tilt), 0.2f)
-            .SetEase(Ease.OutQuad)
-            .SetUpdate(true)
-            .SetRecyclable(true);
-
+        Tween settleTween = ball.ballObject.transform.DOLocalRotate(new Vector3(0, 0, tilt), 0.2f).SetEase(Ease.OutQuad).SetUpdate(true).SetRecyclable(true);
         yield return new WaitForSeconds(0.2f);
         settleTween.Kill();
     }
@@ -421,17 +341,13 @@ public class BallAnimationView : MonoBehaviour
 
         ball.winImage.SetActive(true);
 
-        Sequence winSeq = DOTween.Sequence()
-            .SetRecyclable(true)
-            .SetUpdate(true);
-
+        Sequence winSeq = DOTween.Sequence().SetRecyclable(true).SetUpdate(true);
         winSeq.Append(ball.winImage.transform.DOScale(1.2f, 0.12f));
         winSeq.Append(ball.winImage.transform.DOScale(1f, 0.12f));
         winSeq.SetLoops(2);
         winSeq.OnComplete(() => winSeq.Kill());
     }
 
-    // CONVERTED: Calculate final position in LOCAL space
     private Vector3 CalculateFinalPositionLocal(int ballIndex)
     {
         Vector3 directionLocal = (_endPointLocal - _centerPointLocal).normalized;
@@ -481,12 +397,10 @@ public class BallAnimationView : MonoBehaviour
             _mainAnimationCoroutine = null;
         }
 
-        // Kill all tweens properly
         foreach (var ball in _balls)
         {
             if (ball.ballObject != null)
                 ball.ballObject.transform.DOKill(true);
-
             if (ball.winImage != null)
                 ball.winImage.transform.DOKill(true);
         }
@@ -498,13 +412,11 @@ public class BallAnimationView : MonoBehaviour
         StopCurrentAnimation();
         StopAllCoroutines();
 
-        // Final cleanup
         DOTween.Kill(transform);
         foreach (var ball in _balls)
         {
             if (ball.ballObject != null)
                 DOTween.Kill(ball.ballObject.transform);
-
             if (ball.winImage != null)
                 DOTween.Kill(ball.winImage.transform);
         }
