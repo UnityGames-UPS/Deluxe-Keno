@@ -175,7 +175,7 @@ public class SocketBackendService : IBackendService
             UIController uiManager = UnityEngine.Object.FindObjectOfType<UIController>();
             uiManager?.CheckAndClosePopups();
             GameEvents.TriggerConnectionRestored();
-        }
+        }   
 
         _hasEverConnected = true;
         ResetHeartbeat();

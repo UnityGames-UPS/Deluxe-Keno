@@ -35,13 +35,15 @@ public class UIController : MonoBehaviour
     [SerializeField] private TextMeshProUGUI _autoPlayRoundsText;
 
     [Header("Connection Popups")]
-    [SerializeField] private GameObject _mainPopupObject;
-    [SerializeField] private GameObject _disconnectPopupObject;
-    [SerializeField] private GameObject _reconnectPopupObject;
+    [SerializeField] private GameObject _reconnectPopupMainPanel;
+    [SerializeField] private GameObject _reconnectPopupArea;
+    [SerializeField] private GameObject _disconnectPopupMainPanel;
+    [SerializeField] private GameObject _disconnectPopupArea;
     [SerializeField] private Button _closeDisconnectButton;
 
     [Header("Quit Game Popup")]
-    [SerializeField] private GameObject _quitGameObject;
+    [SerializeField] private GameObject _quitGamePopupMainPanel;
+    [SerializeField] private GameObject _quitGamePopupArea;
     [SerializeField] private Button _quitGameButton;
     [SerializeField] private Button _yesQuitButton;
     [SerializeField] private Button _noQuitButton;
@@ -87,16 +89,6 @@ public class UIController : MonoBehaviour
 
     private StringBuilder _stringBuilder = new StringBuilder(32);
 
-    public enum PopupPriority
-    {
-        None = 0,
-        Reconnect = 1,
-        Disconnect = 2,
-        Quit = 3
-    }
-
-    private PopupPriority _currentPopupPriority = PopupPriority.None;
-
     private void Start()
     {
         IsQuitSelf = false;
@@ -128,7 +120,7 @@ public class UIController : MonoBehaviour
 
             if (elapsed > timeout)
             {
-                ShowPopup(_disconnectPopupObject, PopupPriority.Disconnect);
+                ShowDisconnectPopup();
                 yield break;
             }
         }
@@ -164,10 +156,9 @@ public class UIController : MonoBehaviour
         _betPopupMainPanel?.SetActive(false);
         _autoBetPopupMainPanel?.SetActive(false);
         _winPopupMainPanel?.SetActive(false);
-        _mainPopupObject?.SetActive(false);
-        _reconnectPopupObject?.SetActive(false);
-        _disconnectPopupObject?.SetActive(false);
-        _quitGameObject?.SetActive(false);
+        _reconnectPopupMainPanel?.SetActive(false);
+        _disconnectPopupMainPanel?.SetActive(false);
+        _quitGamePopupMainPanel?.SetActive(false);
 
         if (_playButton != null)
         {
@@ -246,9 +237,9 @@ public class UIController : MonoBehaviour
         GameEvents.OnAutoPlayToggled += HandleAutoPlayToggled;
         GameEvents.OnShowWinPopup += ShowWinPopup;
         GameEvents.OnSpeedModeChanged += HandleSpeedModeChanged;
-        GameEvents.OnConnectionUnstable += () => ShowPopup(_reconnectPopupObject, PopupPriority.Reconnect);
+        GameEvents.OnConnectionUnstable += ShowReconnectPopup;
         GameEvents.OnConnectionLost += HandleConnectionLost;
-        GameEvents.OnConnectionRestored += CheckAndClosePopups;
+        GameEvents.OnConnectionRestored += HandleConnectionRestored;
     }
 
     private void UnsubscribeFromEvents()
@@ -478,50 +469,66 @@ public class UIController : MonoBehaviour
     #endregion
 
     #region Connection Popup Management
-    internal void ShowPopup(GameObject popup, PopupPriority priority)
+    private void ShowReconnectPopup()
     {
-        if (priority < _currentPopupPriority) return;
-
-        CloseAllConnectionPopups();
-
-        if (popup != null)
+        _reconnectPopupMainPanel?.SetActive(true);
+        if (_reconnectPopupArea != null)
         {
-            popup.SetActive(true);
-            _currentPopupPriority = priority;
+            _reconnectPopupArea.SetActive(true);
+            AnimatePopupShow(_reconnectPopupArea);
         }
+    }
 
-        _mainPopupObject?.SetActive(true);
+    private void CloseReconnectPopup()
+    {
+        if (_reconnectPopupArea != null)
+        {
+            AnimatePopupHide(_reconnectPopupArea, () => _reconnectPopupMainPanel?.SetActive(false));
+        }
+        else
+        {
+            _reconnectPopupMainPanel?.SetActive(false);
+        }
+    }
+
+    private void ShowDisconnectPopup()
+    {
+        _disconnectPopupMainPanel?.SetActive(true);
+        if (_disconnectPopupArea != null)
+        {
+            _disconnectPopupArea.SetActive(true);
+            AnimatePopupShow(_disconnectPopupArea);
+        }
+    }
+
+    private void CloseDisconnectPopup()
+    {
+        if (_disconnectPopupArea != null)
+        {
+            AnimatePopupHide(_disconnectPopupArea, () => _disconnectPopupMainPanel?.SetActive(false));
+        }
+        else
+        {
+            _disconnectPopupMainPanel?.SetActive(false);
+        }
     }
 
     internal void CheckAndClosePopups()
     {
-        CloseAllConnectionPopups();
-        _currentPopupPriority = PopupPriority.None;
+        CloseReconnectPopup();
+        CloseDisconnectPopup();
     }
 
     private void HandleConnectionLost()
     {
         if (!IsQuitSelf)
-            ShowPopup(_disconnectPopupObject, PopupPriority.Disconnect);
+            ShowDisconnectPopup();
     }
 
-    private void CloseAllConnectionPopups()
+    private void HandleConnectionRestored()
     {
-        if (_reconnectPopupObject != null && _reconnectPopupObject.gameObject != null)
-            _reconnectPopupObject.SetActive(false);
-        if (_disconnectPopupObject != null && _disconnectPopupObject.gameObject != null)
-            _disconnectPopupObject.SetActive(false);
-        if (_quitGameObject != null && _quitGameObject.gameObject != null)
-            _quitGameObject.SetActive(false);
-
-        bool allClosed = (_reconnectPopupObject == null || !_reconnectPopupObject.activeSelf) &&
-                         (_disconnectPopupObject == null || !_disconnectPopupObject.activeSelf) &&
-                         (_quitGameObject == null || !_quitGameObject.activeSelf);
-
-        if (allClosed && _mainPopupObject != null && _mainPopupObject.gameObject != null)
-        {
-            _mainPopupObject.SetActive(false);
-        }
+        CloseReconnectPopup();
+        CloseDisconnectPopup();
     }
     #endregion
 
@@ -529,15 +536,25 @@ public class UIController : MonoBehaviour
     private void OpenQuitGamePopup()
     {
         AudioManager.Instance?.PlayButtonClick();
-        ShowPopup(_quitGameObject, PopupPriority.Quit);
+        _quitGamePopupMainPanel?.SetActive(true);
+        if (_quitGamePopupArea != null)
+        {
+            _quitGamePopupArea.SetActive(true);
+            AnimatePopupShow(_quitGamePopupArea);
+        }
     }
 
     private void CloseQuitGamePopup()
     {
         AudioManager.Instance?.PlayButtonClick();
-        _quitGameObject?.SetActive(false);
-        _currentPopupPriority = PopupPriority.None;
-        CheckAndClosePopups();
+        if (_quitGamePopupArea != null)
+        {
+            AnimatePopupHide(_quitGamePopupArea, () => _quitGamePopupMainPanel?.SetActive(false));
+        }
+        else
+        {
+            _quitGamePopupMainPanel?.SetActive(false);
+        }
     }
 
     private void QuitGame()
@@ -819,12 +836,12 @@ public class UIController : MonoBehaviour
             _winPopupArea.transform.DOKill(true);
         if (_winAmountText != null && _winAmountText.transform != null)
             _winAmountText.transform.DOKill(true);
-        if (_reconnectPopupObject != null && _reconnectPopupObject.transform != null)
-            _reconnectPopupObject.transform.DOKill(true);
-        if (_disconnectPopupObject != null && _disconnectPopupObject.transform != null)
-            _disconnectPopupObject.transform.DOKill(true);
-        if (_quitGameObject != null && _quitGameObject.transform != null)
-            _quitGameObject.transform.DOKill(true);
+        if (_reconnectPopupArea != null && _reconnectPopupArea.transform != null)
+            _reconnectPopupArea.transform.DOKill(true);
+        if (_disconnectPopupArea != null && _disconnectPopupArea.transform != null)
+            _disconnectPopupArea.transform.DOKill(true);
+        if (_quitGamePopupArea != null && _quitGamePopupArea.transform != null)
+            _quitGamePopupArea.transform.DOKill(true);
     }
     #endregion
 }
