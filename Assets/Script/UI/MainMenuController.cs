@@ -151,14 +151,14 @@ public class MainMenuController : MonoBehaviour
         if (_menuCloseButton != null)
             _menuCloseButton.onClick.AddListener(CloseMenu);
 
-        // Background click to close
+       /* // Background click to close
         if (_mainMenuPanel != null)
         {
             Button bgButton = _mainMenuPanel.GetComponent<Button>();
             if (bgButton == null)
                 bgButton = _mainMenuPanel.AddComponent<Button>();
             bgButton.onClick.AddListener(CloseMenu);
-        }
+        }*/
 
         // Sub-panel navigation
         if (_howToPlayButton != null)
