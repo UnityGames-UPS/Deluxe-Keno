@@ -75,7 +75,7 @@ public class SocketEventHandler
                 balance = (float)response.player.balance
             };
 
-            Debug.Log("=== PARSED RESULT DATA ===");
+          /*  Debug.Log("=== PARSED RESULT DATA ===");
             Debug.Log($"Success: {resultData.success}");
             Debug.Log($"Drawn Numbers: {string.Join(", ", resultData.drawn)}");
             Debug.Log($"Hit Numbers: {string.Join(", ", resultData.hits)}");
@@ -83,7 +83,7 @@ public class SocketEventHandler
             Debug.Log($"Win Amount: ${resultData.currentWinning:F2}");
             Debug.Log($"Total Bet: ${resultData.totalBet:F2}");
             Debug.Log($"New Balance: ${resultData.balance:F3}");
-            Debug.Log("==========================");
+            Debug.Log("==========================");*/
 
             return resultData;
         }

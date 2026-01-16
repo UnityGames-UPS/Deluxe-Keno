@@ -1,4 +1,5 @@
 using System.Collections;
+using Unity.VisualScripting;
 using UnityEngine;
 
 public class GameController : MonoBehaviour
@@ -300,7 +301,6 @@ public class GameController : MonoBehaviour
         if (!_isInitialized) return;
 
         _model.SetAutoPlay(isActive);
-
         if (!isActive && _autoPlayCoroutine != null)
         {
             StopCoroutine(_autoPlayCoroutine);
@@ -355,19 +355,21 @@ public class GameController : MonoBehaviour
     {
         if (!_isInitialized) return;
         _model.SetSpeedMode(mode);
+        
     }
 
     private void HandleAnimationCompleted()
     {
         GameEvents.TriggerPaytableHighlight();
         EndGame();
-
         if (_model.PlayerData.isAutoPlayActive && _model.CanPlay())
+        {
             _autoPlayCoroutine = StartCoroutine(AutoPlayNextRound());
+        }
     }
     #endregion
 
-    #region Game Flow
+        #region Game Flow
     private void StartGame()
     {
         _model.StartGame();
@@ -406,19 +408,23 @@ public class GameController : MonoBehaviour
 
     private IEnumerator AutoPlayNextRound()
     {
-        yield return new WaitForSeconds(0.5f);
-
-        if (_model.PlayerData.isAutoPlayActive && _model.CanPlay() && _backendService.IsConnected)
+    
+        yield return new WaitForSecondsRealtime(0.5f);
+        if (_model.PlayerData.balance < _model.PlayerData.currentBet)
+        {
+            ErrorPopupManager.ShowError(ErrorMessages.INSUFFICIENT_BALANCE);
+            GameEvents.TriggerAutoPlayToggled(false);
+            yield break;
+        }
+        if (_model.PlayerData.isAutoPlayActive && _model.CanPlay() && _backendService.IsConnected)  
         {
             StartGame();
+            
         }
         else
         {
-            if (_model.PlayerData.balance < _model.PlayerData.currentBet)
-                ErrorPopupManager.ShowError(ErrorMessages.INSUFFICIENT_BALANCE);
-            else if (!_backendService.IsConnected)
+            if (!_backendService.IsConnected)
                 ErrorPopupManager.ShowError(ErrorMessages.CONNECTION_LOST);
-
             GameEvents.TriggerAutoPlayToggled(false);
         }
 

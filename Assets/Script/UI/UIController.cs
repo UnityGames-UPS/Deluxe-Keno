@@ -1,9 +1,10 @@
-using UnityEngine;
-using UnityEngine.UI;
-using TMPro;
 using DG.Tweening;
 using System.Collections;
+using System.Collections.Generic;
 using System.Text;
+using TMPro;
+using UnityEngine;
+using UnityEngine.UI;
 
 public class UIController : MonoBehaviour
 {
@@ -48,11 +49,11 @@ public class UIController : MonoBehaviour
     [SerializeField] private Button _yesQuitButton;
     [SerializeField] private Button _noQuitButton;
 
-    [Header("Bet Popup")]
+    [Header("Bet Popup - DYNAMIC")]
     [SerializeField] private GameObject _betPopupMainPanel;
     [SerializeField] private GameObject _betPopupArea;
-    [SerializeField] private Button[] _betButtons = new Button[8];
-    [SerializeField] private GameObject[] _betButtonsSelected = new GameObject[8];
+    [SerializeField] private Transform _betButtonsContainer; 
+    [SerializeField] private GameObject _betButtonPrefab; 
     [SerializeField] private Button _betPopupCloseButton;
     [SerializeField] private Color _betNormalColor = Color.white;
     [SerializeField] private Color _betSelectedColor = Color.yellow;
@@ -89,6 +90,11 @@ public class UIController : MonoBehaviour
 
     private StringBuilder _stringBuilder = new StringBuilder(32);
 
+    // NEW: Dynamic bet buttons tracking
+    private List<Button> _dynamicBetButtons = new List<Button>();
+    private List<GameObject> _dynamicBetSelectedImages = new List<GameObject>();
+    private float[] _availableBets;
+
     private void Start()
     {
         IsQuitSelf = false;
@@ -103,6 +109,7 @@ public class UIController : MonoBehaviour
         UnsubscribeFromEvents();
         RemoveButtonListeners();
         CleanupAnimations();
+        ClearDynamicBetButtons();
     }
 
     internal IEnumerator WaitForGameControllerAndInitialize()
@@ -137,6 +144,11 @@ public class UIController : MonoBehaviour
         if (model == null || model.InitData == null) return;
 
         _selectedBet = model.PlayerData.currentBet;
+        _availableBets = model.InitData.bets;
+
+        // NEW: Create dynamic bet buttons
+        CreateDynamicBetButtons();
+
         UpdateBetDisplay(_selectedBet);
         UpdateBalanceDisplay(model.PlayerData.balance);
         UpdateWinDisplay(model.LastWinAmount);
@@ -175,6 +187,125 @@ public class UIController : MonoBehaviour
         SetMainControlButtonsInteractable(true);
     }
 
+    #region Dynamic Bet Buttons
+
+    /// <summary>
+    /// Creates bet buttons dynamically based on available bets from server
+    /// </summary>
+    private void CreateDynamicBetButtons()
+    {
+        ClearDynamicBetButtons();
+
+        if (_availableBets == null || _availableBets.Length == 0)
+        {
+            Debug.LogError("[UIController] No bets available to create buttons");
+            return;
+        }
+
+        if (_betButtonPrefab == null || _betButtonsContainer == null)
+        {
+            Debug.LogError("[UIController] Bet button prefab or container not assigned!");
+            return;
+        }
+
+        for (int i = 0; i < _availableBets.Length; i++)
+        {
+            float betValue = _availableBets[i];
+            GameObject buttonObj = Instantiate(_betButtonPrefab, _betButtonsContainer);
+
+            // Get button component
+            Button button = buttonObj.GetComponent<Button>();
+            if (button == null)
+            {
+                Debug.LogError($"[UIController] Bet button prefab missing Button component!");
+                Destroy(buttonObj);
+                continue;
+            }
+
+            // Find text component
+            TextMeshProUGUI btnText = buttonObj.GetComponentInChildren<TextMeshProUGUI>();
+            if (btnText != null)
+            {
+                _stringBuilder.Clear();
+                _stringBuilder.Append(betValue.ToString("F2"));
+                btnText.text = _stringBuilder.ToString();
+                btnText.color = _betNormalColor;
+            }
+
+            // Find selected image (should be child named "Selected" or similar)
+            Transform selectedTransform = buttonObj.transform.Find("Selected");
+            GameObject selectedImage = selectedTransform != null ? selectedTransform.gameObject : null;
+
+            if (selectedImage != null)
+            {
+                selectedImage.SetActive(false);
+                _dynamicBetSelectedImages.Add(selectedImage);
+            }
+            else
+            {
+                _dynamicBetSelectedImages.Add(null);
+            }
+
+            // Add click listener
+            button.onClick.AddListener(() => OnBetSelected(betValue));
+
+            _dynamicBetButtons.Add(button);
+            buttonObj.SetActive(true);
+        }
+
+        Debug.Log($"[UIController] Created {_dynamicBetButtons.Count} dynamic bet buttons");
+    }
+
+    /// <summary>
+    /// Clears all dynamically created bet buttons
+    /// </summary>
+    private void ClearDynamicBetButtons()
+    {
+        foreach (Button btn in _dynamicBetButtons)
+        {
+            if (btn != null)
+            {
+                btn.onClick.RemoveAllListeners();
+                Destroy(btn.gameObject);
+            }
+        }
+
+        _dynamicBetButtons.Clear();
+        _dynamicBetSelectedImages.Clear();
+    }
+
+    /// <summary>
+    /// Updates visual state of all bet buttons
+    /// </summary>
+    private void UpdateBetButtons()
+    {
+        if (_availableBets == null) return;
+
+        for (int i = 0; i < _dynamicBetButtons.Count && i < _availableBets.Length; i++)
+        {
+            Button button = _dynamicBetButtons[i];
+            if (button == null) continue;
+
+            float betValue = _availableBets[i];
+            bool isSelected = Mathf.Approximately(betValue, _selectedBet);
+
+            // Update text color
+            TextMeshProUGUI btnText = button.GetComponentInChildren<TextMeshProUGUI>();
+            if (btnText != null)
+            {
+                btnText.color = isSelected ? _betSelectedColor : _betNormalColor;
+            }
+
+            // Update selected image
+            if (i < _dynamicBetSelectedImages.Count && _dynamicBetSelectedImages[i] != null)
+            {
+                _dynamicBetSelectedImages[i].SetActive(isSelected);
+            }
+        }
+    }
+
+    #endregion
+
     #region Button Setup
     private void SetupButtonListeners()
     {
@@ -194,8 +325,8 @@ public class UIController : MonoBehaviour
         _yesQuitButton?.onClick.AddListener(QuitGame);
         _noQuitButton?.onClick.AddListener(CloseQuitGamePopup);
 
-        AddBackgroundClickListener(_betPopupMainPanel, CloseBetPopup);
-        AddBackgroundClickListener(_autoBetPopupMainPanel, CloseAutoBetPopup);
+        //AddBackgroundClickListener(_betPopupMainPanel, CloseBetPopup);
+        //AddBackgroundClickListener(_autoBetPopupMainPanel, CloseAutoBetPopup);
     }
 
     private void AddBackgroundClickListener(GameObject panel, UnityEngine.Events.UnityAction action)
@@ -340,7 +471,6 @@ public class UIController : MonoBehaviour
             case SpeedMode.Turbo: AudioManager.Instance.PlayTurboSpeedClick(); break;
             case SpeedMode.Instant: AudioManager.Instance.PlayInstantSpeedClick(); break;
         }
-
         GameEvents.TriggerSpeedModeChanged(mode);
     }
 
@@ -656,7 +786,6 @@ public class UIController : MonoBehaviour
         {
             _autoBetPopupMainPanel?.SetActive(false);
         }
-        if (!_isAutoPlayMode)
             _autoBetButtonSelected?.SetActive(false);
     }
 
@@ -673,41 +802,6 @@ public class UIController : MonoBehaviour
         {
             _autoBetPopupMainPanel?.SetActive(false);
             GameEvents.TriggerPlayButtonClicked();
-        }
-    }
-
-    private void UpdateBetButtons()
-    {
-        if (GameController.Instance == null || GameController.Instance.GetModel() == null) return;
-        float[] bets = GameController.Instance.GetModel().InitData.bets;
-
-        for (int i = 0; i < _betButtons.Length && i < bets.Length; i++)
-        {
-            if (_betButtons[i] != null)
-            {
-                TextMeshProUGUI btnText = _betButtons[i].GetComponentInChildren<TextMeshProUGUI>();
-                if (btnText != null)
-                {
-                    _stringBuilder.Clear();
-                    _stringBuilder.Append(bets[i].ToString("F2"));
-                    btnText.text = _stringBuilder.ToString();
-                    btnText.color = Mathf.Approximately(bets[i], _selectedBet) ? _betSelectedColor : _betNormalColor;
-                }
-
-                _betButtons[i].onClick.RemoveAllListeners();
-                float betValue = bets[i];
-                _betButtons[i].onClick.AddListener(() => OnBetSelected(betValue));
-                _betButtons[i].gameObject.SetActive(true);
-
-                if (_betButtonsSelected[i] != null)
-                    _betButtonsSelected[i].SetActive(Mathf.Approximately(betValue, _selectedBet));
-            }
-        }
-
-        for (int i = bets.Length; i < _betButtons.Length; i++)
-        {
-            if (_betButtons[i] != null)
-                _betButtons[i].gameObject.SetActive(false);
         }
     }
 
@@ -759,6 +853,7 @@ public class UIController : MonoBehaviour
         UpdateAutoRoundButtons();
     }
     #endregion
+
 
     #region Animations
     private void AnimateButton(GameObject button)

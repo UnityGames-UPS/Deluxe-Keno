@@ -46,6 +46,7 @@ public class BallAnimationView : MonoBehaviour
     private bool _isAnimating;
     private bool _speedModeChangeRequested;
     private bool _isIntroActive;
+    private bool _hasCompletedThisRound; // NEW: Track if we've already triggered completion
 
     private HashSet<int> _winningNumbersSet = new HashSet<int>();
 
@@ -138,6 +139,7 @@ public class BallAnimationView : MonoBehaviour
         _currentBallIndex = 0;
         _isAnimating = true;
         _speedModeChangeRequested = false;
+        _hasCompletedThisRound = false; // NEW: Reset completion flag for new round
 
         _winningNumbersSet.Clear();
         foreach (int hit in result.hits)
@@ -165,7 +167,12 @@ public class BallAnimationView : MonoBehaviour
         else
             yield return AnimateNormalMode(result, startIndex);
 
-        CompleteAnimation(result);
+        // NEW: Only trigger completion once per round
+        if (!_hasCompletedThisRound)
+        {
+            _hasCompletedThisRound = true;
+            CompleteAnimation(result);
+        }
     }
 
     private IEnumerator AnimateInstantMode(GameResultData result, int startIndex)
@@ -197,7 +204,8 @@ public class BallAnimationView : MonoBehaviour
             if (_speedModeChangeRequested)
             {
                 _speedModeChangeRequested = false;
-                yield return AnimateDrawSequence(result, i);
+                // NEW: Don't trigger completion when restarting animation
+                yield return AnimateDrawSequenceInternal(result, i);
                 yield break;
             }
 
@@ -225,6 +233,19 @@ public class BallAnimationView : MonoBehaviour
             GameEvents.TriggerBallDrawn(number, isWin);
             yield return new WaitForSeconds(GetCurrentDelay());
         }
+    }
+
+    // NEW: Internal method that doesn't trigger completion
+    private IEnumerator AnimateDrawSequenceInternal(GameResultData result, int startIndex)
+    {
+        _speedModeChangeRequested = false;
+
+        if (_currentSpeedMode == SpeedMode.Instant)
+            yield return AnimateInstantMode(result, startIndex);
+        else
+            yield return AnimateNormalMode(result, startIndex);
+
+        // Don't call CompleteAnimation here - already handled by parent
     }
 
     private IEnumerator AnimateSingleBallAsync(int ballIndex, int number, bool isWinning)
@@ -386,6 +407,7 @@ public class BallAnimationView : MonoBehaviour
         _currentBallIndex = 0;
         _currentResult = null;
         _speedModeChangeRequested = false;
+        _hasCompletedThisRound = false; // NEW: Reset completion flag
         _winningNumbersSet.Clear();
     }
 

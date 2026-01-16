@@ -69,7 +69,6 @@ public class GameModel
     public bool CanPlay() =>
         _playerData.selectedNumbers.Count >= GameConfig.MIN_NUMBERS &&
         _playerData.selectedNumbers.Count <= GameConfig.MAX_NUMBERS &&
-        _playerData.balance >= _playerData.currentBet &&
         !_gameState.isPlaying;
 
     public void StartGame()
@@ -91,10 +90,10 @@ public class GameModel
     public void EndGame()
     {
         _gameState.isPlaying = false;
-
-        if (_playerData.isAutoPlayActive &&
-            (_gameState.currentRound >= _gameState.totalAutoRounds ||
-             _playerData.balance < _playerData.currentBet))
+        Debug.Log("EndGame");
+        Debug.Log("isautoplayactive in endgame" + _playerData.isAutoPlayActive);
+        Debug.Log("currentround " + _gameState.currentRound + "totalautoround" + _gameState.totalAutoRounds);
+        if (_playerData.isAutoPlayActive && (_gameState.currentRound >= _gameState.totalAutoRounds))
         {
             _playerData.isAutoPlayActive = false;
             _gameState.currentRound = 0;

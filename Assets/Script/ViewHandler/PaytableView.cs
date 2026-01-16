@@ -10,7 +10,7 @@ public class PaytableView : MonoBehaviour
     public class PaytableRowUI
     {
         public TextMeshProUGUI hitsText;
-        public TextMeshProUGUI multiplierText;
+        public TextMeshProUGUI winAmountText; // Changed from multiplierText to winAmountText
     }
 
     [Header("Paytable Rows (Need 16 rows: 0-15)")]
@@ -26,22 +26,17 @@ public class PaytableView : MonoBehaviour
     private int _currentHitsDuringAnimation;
     private bool _isAnimationActive;
     private GameResultData _pendingResult;
+    private float _currentBet = 0f;
 
     // OPTIMIZATION: Cached strings to avoid allocations
     private static readonly string[] _cachedHitNumbers = new string[16];
-    private static readonly string[] _cachedMultipliers = new string[10001];
-    private static StringBuilder _stringBuilder = new StringBuilder(16);
+    private static StringBuilder _stringBuilder = new StringBuilder(32);
 
     static PaytableView()
     {
         // Cache common strings
         for (int i = 0; i < 16; i++)
             _cachedHitNumbers[i] = i.ToString();
-
-        // Cache multiplier strings up to 10000x
-        _cachedMultipliers[0] = "0";
-        for (int i = 1; i <= 10000; i++)
-            _cachedMultipliers[i] = $"x{i}";
     }
 
     private void Start()
@@ -73,6 +68,7 @@ public class PaytableView : MonoBehaviour
         GameEvents.OnGameStarted += HandleGameStarted;
         GameEvents.OnGameEnded += HandleGameEnded;
         GameEvents.OnAllNumbersCleared += HandleClearAll;
+        GameEvents.OnBetChanged += HandleBetChanged;
     }
 
     private void UnsubscribeFromEvents()
@@ -84,6 +80,18 @@ public class PaytableView : MonoBehaviour
         GameEvents.OnGameStarted -= HandleGameStarted;
         GameEvents.OnGameEnded -= HandleGameEnded;
         GameEvents.OnAllNumbersCleared -= HandleClearAll;
+        GameEvents.OnBetChanged -= HandleBetChanged;
+    }
+
+    private void HandleBetChanged(float bet)
+    {
+        _currentBet = bet;
+
+        // Refresh paytable display with new bet amounts
+        if (_currentSelectedCount > 0)
+        {
+            UpdatePaytableDisplay();
+        }
     }
 
     private void HandlePaytableUpdate(int selectedCount)
@@ -149,10 +157,12 @@ public class PaytableView : MonoBehaviour
             return;
         }
 
+        // Get current bet amount
+        float currentBet = _currentBet > 0 ? _currentBet : GameController.Instance.GetModel().PlayerData.currentBet;
         float[] payouts = GameController.Instance.GetModel().InitData.paytable[_currentSelectedCount - 1];
 
         // Row 0: Always "0 hits = 0 win"
-        UpdateRow(0, 0f, _zeroPayoutColor, true);
+        UpdateRow(0, 0f, currentBet, _zeroPayoutColor, true);
 
         // Rows 1 to selectedCount
         for (int hits = 1; hits <= _currentSelectedCount && hits < _paytableRows.Count; hits++)
@@ -162,8 +172,9 @@ public class PaytableView : MonoBehaviour
             if (paytableIndex < payouts.Length)
             {
                 float multiplier = payouts[paytableIndex];
+                float winAmount = currentBet * multiplier;
                 Color textColor = multiplier == 0 ? _zeroPayoutColor : _normalColor;
-                UpdateRow(hits, multiplier, textColor, true);
+                UpdateRow(hits, winAmount, currentBet, textColor, true);
             }
             else
             {
@@ -177,13 +188,14 @@ public class PaytableView : MonoBehaviour
             SetRowVisible(_paytableRows[hits], false);
         }
 
-        GameLogger.Log($"Paytable updated for {_currentSelectedCount} selections");
+        GameLogger.Log($"Paytable updated for {_currentSelectedCount} selections with bet ${currentBet:F2}");
     }
 
     private void UpdatePaytableDisplayWithActiveHighlight(int previousHits, int currentHits)
     {
         if (_currentSelectedCount < 1) return;
 
+        float currentBet = _currentBet > 0 ? _currentBet : GameController.Instance.GetModel().PlayerData.currentBet;
         float[] payouts = GameController.Instance.GetModel().InitData.paytable[_currentSelectedCount - 1];
 
         // Clear previous highlight
@@ -212,7 +224,7 @@ public class PaytableView : MonoBehaviour
         }
     }
 
-    private void UpdateRow(int hitsCount, float multiplier, Color color, bool show)
+    private void UpdateRow(int hitsCount, float winAmount, float currentBet, Color color, bool show)
     {
         if (hitsCount >= _paytableRows.Count) return;
 
@@ -225,26 +237,37 @@ public class PaytableView : MonoBehaviour
             row.hitsText.color = color;
         }
 
-        if (row.multiplierText != null)
+        if (row.winAmountText != null)
         {
-            row.multiplierText.gameObject.SetActive(show);
+            row.winAmountText.gameObject.SetActive(show);
 
-            // OPTIMIZED: Use cached strings
-            int multiplierInt = (int)multiplier;
-            if (multiplierInt == multiplier && multiplierInt < _cachedMultipliers.Length)
+            // Format win amount with currency symbol
+            _stringBuilder.Clear();
+
+            // Show win amount with appropriate decimal places
+            if (winAmount >= 1000)
             {
-                row.multiplierText.text = _cachedMultipliers[multiplierInt];
+                // For large amounts, show with comma separators
+                _stringBuilder.Append(winAmount.ToString("N2"));
+            }
+            else if (winAmount >= 1)
+            {
+                // For medium amounts, show 2 decimals
+                _stringBuilder.Append(winAmount.ToString("F2"));
+            }
+            else if (winAmount > 0)
+            {
+                // For small amounts, show 2 decimals
+                _stringBuilder.Append(winAmount.ToString("F2"));
             }
             else
             {
-                // Fallback for decimal multipliers
-                _stringBuilder.Clear();
-                _stringBuilder.Append('x');
-                _stringBuilder.Append(multiplier.ToString("F1"));
-                row.multiplierText.text = _stringBuilder.ToString();
+                // For zero
+                _stringBuilder.Append("0");
             }
 
-            row.multiplierText.color = color;
+            row.winAmountText.text = _stringBuilder.ToString();
+            row.winAmountText.color = color;
         }
     }
 
@@ -257,14 +280,15 @@ public class PaytableView : MonoBehaviour
         if (row.hitsText != null)
             row.hitsText.color = color;
 
-        if (row.multiplierText != null)
-            row.multiplierText.color = color;
+        if (row.winAmountText != null)
+            row.winAmountText.color = color;
     }
 
     private void HighlightWinningRow(int hits)
     {
         if (_currentSelectedCount < 1) return;
 
+        float currentBet = _currentBet > 0 ? _currentBet : GameController.Instance.GetModel().PlayerData.currentBet;
         float[] payouts = GameController.Instance.GetModel().InitData.paytable[_currentSelectedCount - 1];
 
         // Reset all rows to base colors
@@ -301,11 +325,11 @@ public class PaytableView : MonoBehaviour
             punchTween.OnComplete(() => punchTween.Kill());
         }
 
-        if (row.multiplierText != null)
+        if (row.winAmountText != null)
         {
-            row.multiplierText.transform.DOKill(true);
+            row.winAmountText.transform.DOKill(true);
 
-            Tween punchTween = row.multiplierText.transform.DOPunchScale(Vector3.one * scale, 0.3f, 4, 0.4f)
+            Tween punchTween = row.winAmountText.transform.DOPunchScale(Vector3.one * scale, 0.3f, 4, 0.4f)
                 .SetUpdate(true)
                 .SetRecyclable(true);
 
@@ -318,8 +342,8 @@ public class PaytableView : MonoBehaviour
         if (row.hitsText != null)
             row.hitsText.gameObject.SetActive(visible);
 
-        if (row.multiplierText != null)
-            row.multiplierText.gameObject.SetActive(visible);
+        if (row.winAmountText != null)
+            row.winAmountText.gameObject.SetActive(visible);
     }
 
     private void HideAllRows()
@@ -337,8 +361,8 @@ public class PaytableView : MonoBehaviour
             if (row.hitsText != null)
                 row.hitsText.transform.DOKill(true);
 
-            if (row.multiplierText != null)
-                row.multiplierText.transform.DOKill(true);
+            if (row.winAmountText != null)
+                row.winAmountText.transform.DOKill(true);
         }
 
         DOTween.Kill(this);

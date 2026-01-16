@@ -245,7 +245,7 @@ public class SocketBackendService : IBackendService
 
     private void OnPongReceived(string data)
     {
-        Debug.Log($"[Socket] Pong received - Latency: {(Time.time - _lastPongTime) * 1000:F0}ms");
+      //  Debug.Log($"[Socket] Pong received - Latency: {(Time.time - _lastPongTime) * 1000:F0}ms");
         _waitingForPong = false;
         _missedPongs = 0;
         _lastPongTime = Time.time;
@@ -329,7 +329,7 @@ public class SocketBackendService : IBackendService
             _waitingForPong = true;
             _lastPongTime = Time.time;
 
-            Debug.Log("[Socket] Sending ping");
+           // Debug.Log("[Socket] Sending ping");
             EmitEvent("ping");
 
             yield return new WaitForSeconds(PING_INTERVAL);
