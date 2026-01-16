@@ -411,9 +411,10 @@ public class GameController : MonoBehaviour
     
         yield return new WaitForSecondsRealtime(0.5f);
         if (_model.PlayerData.balance < _model.PlayerData.currentBet)
-        {
+        { 
             ErrorPopupManager.ShowError(ErrorMessages.INSUFFICIENT_BALANCE);
             GameEvents.TriggerAutoPlayToggled(false);
+           
             yield break;
         }
         if (_model.PlayerData.isAutoPlayActive && _model.CanPlay() && _backendService.IsConnected)  

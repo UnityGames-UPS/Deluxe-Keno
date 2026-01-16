@@ -371,6 +371,7 @@ public class UIController : MonoBehaviour
         GameEvents.OnConnectionUnstable += ShowReconnectPopup;
         GameEvents.OnConnectionLost += HandleConnectionLost;
         GameEvents.OnConnectionRestored += HandleConnectionRestored;
+       
     }
 
     private void UnsubscribeFromEvents()
@@ -487,7 +488,7 @@ public class UIController : MonoBehaviour
             ErrorPopupManager.ShowError(ErrorMessages.AUTOPLAY_NO_ROUNDS);
             return;
         }
-
+        _autoBetButtonSelected?.SetActive(false);
         _remainingAutoRounds = _selectedAutoRounds;
         _isAutoPlayMode = true;
         AudioManager.Instance.PlayButtonClick();
@@ -565,11 +566,16 @@ public class UIController : MonoBehaviour
             _mainControlContainer?.SetActive(true);
             _speedControlContainer?.SetActive(false);
             SetMainControlButtonsInteractable(true);
-            _autoBetButtonSelected?.SetActive(false);
+
+
+
+
             _remainingAutoRounds = 0;
             UpdateAutoPlayRoundsDisplay();
         }
+       
     }
+
     #endregion
 
     #region Helper Methods
