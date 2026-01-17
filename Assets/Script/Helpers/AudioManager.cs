@@ -65,6 +65,11 @@ public class AudioManager : MonoBehaviour
     private const int INITIAL_POOL_SIZE = 5;
     #endregion
 
+    #region Focus Management
+    private bool _wasMusicPlayingBeforePause = false;
+    private bool _isApplicationFocused = true;
+    #endregion
+
     private bool _isBeingDestroyed = false;
 
     private void Awake()
@@ -140,13 +145,111 @@ public class AudioManager : MonoBehaviour
             StopBackgroundMusic();
     }
 
+    #region Focus Handling - FIXED
+    private void OnApplicationFocus(bool hasFocus)
+    {
+        if (_isBeingDestroyed) return;
+
+        _isApplicationFocused = hasFocus;
+
+        if (hasFocus)
+        {
+            // Application gained focus
+            Debug.Log("[AudioManager] Application gained focus");
+
+            if (_wasMusicPlayingBeforePause && _musicEnabled)
+            {
+                PlayBackgroundMusic();
+            }
+        }
+        else
+        {
+            // Application lost focus - STOP ALL AUDIO
+            Debug.Log("[AudioManager] Application lost focus - stopping audio");
+
+            if (_bgMusicSource != null && _bgMusicSource.isPlaying)
+            {
+                _wasMusicPlayingBeforePause = true;
+                _bgMusicSource.Pause();
+            }
+            else
+            {
+                _wasMusicPlayingBeforePause = false;
+            }
+
+            StopAllSFX();
+        }
+    }
+
+    private void OnApplicationPause(bool pauseStatus)
+    {
+        if (_isBeingDestroyed) return;
+
+        if (pauseStatus)
+        {
+            // Application is pausing (mobile/background)
+            Debug.Log("[AudioManager] Application paused - stopping audio");
+
+            if (_bgMusicSource != null && _bgMusicSource.isPlaying)
+            {
+                _wasMusicPlayingBeforePause = true;
+                _bgMusicSource.Pause();
+            }
+            else
+            {
+                _wasMusicPlayingBeforePause = false;
+            }
+
+            StopAllSFX();
+        }
+        else
+        {
+            // Application is resuming
+            Debug.Log("[AudioManager] Application resumed");
+
+            if (_wasMusicPlayingBeforePause && _musicEnabled)
+            {
+                PlayBackgroundMusic();
+            }
+        }
+    }
+
+    private void StopAllSFX()
+    {
+        if (_sfxPool == null) return;
+
+        foreach (AudioSource source in _sfxPool)
+        {
+            if (source != null && source.isPlaying)
+            {
+                source.Stop();
+            }
+        }
+
+        // Also stop the main SFX source
+        if (_sfxSource != null && _sfxSource.isPlaying)
+        {
+            _sfxSource.Stop();
+        }
+    }
+    #endregion
+
     #region Public Audio Controls
     public void PlayBackgroundMusic()
     {
         if (_isBeingDestroyed || _bgMusicSource == null || !_musicEnabled || _mainBGMusic == null) return;
+
+        // Only play if application is focused
+        if (!_isApplicationFocused)
+        {
+            Debug.Log("[AudioManager] Skipping music play - application not focused");
+            return;
+        }
+
         _bgMusicSource.clip = _mainBGMusic;
         _bgMusicSource.volume = _musicVolume;
         _bgMusicSource.Play();
+        Debug.Log("[AudioManager] Background music started");
     }
 
     public void StopBackgroundMusic()
@@ -155,7 +258,10 @@ public class AudioManager : MonoBehaviour
         try
         {
             if (_bgMusicSource != null)
+            {
                 _bgMusicSource.Stop();
+                Debug.Log("[AudioManager] Background music stopped");
+            }
         }
         catch (MissingReferenceException) { }
     }
@@ -176,6 +282,13 @@ public class AudioManager : MonoBehaviour
     private void PlaySFX(AudioClip clip)
     {
         if (_isBeingDestroyed || !_sfxEnabled || clip == null) return;
+
+        // Only play SFX if application is focused
+        if (!_isApplicationFocused)
+        {
+            return;
+        }
+
         AudioSource source = GetPooledAudioSource();
         if (source != null)
         {
@@ -259,11 +372,6 @@ public class AudioManager : MonoBehaviour
             _sfxSource = null;
             _instance = null;
         }
-    }
-
-    private void OnApplicationQuit()
-    {
-        _isBeingDestroyed = true;
     }
     #endregion
 }
