@@ -66,17 +66,36 @@ public class NumberButton : MonoBehaviour
 
     private void OnButtonClicked()
     {
-        // FIXED: Don't auto-select/deselect - just send the request
-        // Let GameController decide if selection is valid
-        if (_isSelected)
+        // FIXED: If button has drawn/win state, clear it first and toggle selection
+        if (_isDrawn || _isWinning)
         {
-            // Request to deselect
-            GameEvents.TriggerNumberDeselected(_number);
+            // Clear the drawn/win visual states
+            _isDrawn = false;
+            _isWinning = false;
+
+            // After clearing drawn/win, toggle selection based on current _isSelected state
+            if (_isSelected)
+            {
+                // Was selected before drawing - deselect it
+                GameEvents.TriggerNumberDeselected(_number);
+            }
+            else
+            {
+                // Was not selected - select it
+                GameEvents.TriggerNumberSelected(_number);
+            }
         }
         else
         {
-            // Request to select - don't select yet, wait for GameController validation
-            GameEvents.TriggerNumberSelected(_number);
+            // Normal behavior - no drawn/win state
+            if (_isSelected)
+            {
+                GameEvents.TriggerNumberDeselected(_number);
+            }
+            else
+            {
+                GameEvents.TriggerNumberSelected(_number);
+            }
         }
 
         AnimateButtonPress();

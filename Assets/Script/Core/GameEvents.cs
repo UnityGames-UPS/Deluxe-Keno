@@ -11,10 +11,9 @@ public static class GameEvents
     public static event Action<int> OnNumberDeselected;
     public static event Action OnAllNumbersCleared;
     public static event Action<List<int>> OnQuickPickSelected;
-
-    // NEW: Event for updating button visual state after validation
     public static event Action<int, bool> OnNumberVisualUpdate;
-
+    //public static event Action OnClearAllDrawnStates;
+    
     // Betting Events
     public static event Action<float> OnBetChanged;
     public static event Action<int> OnAutoBetRoundsChanged;
@@ -63,10 +62,9 @@ public static class GameEvents
     public static void TriggerNumberDeselected(int number) => OnNumberDeselected?.Invoke(number);
     public static void TriggerAllNumbersCleared() => OnAllNumbersCleared?.Invoke();
     public static void TriggerQuickPickSelected(List<int> numbers) => OnQuickPickSelected?.Invoke(numbers);
-
-    // NEW: Trigger visual update for specific button
     public static void TriggerNumberVisualUpdate(int number, bool selected) => OnNumberVisualUpdate?.Invoke(number, selected);
 
+    //public static void TriggerClearAllDrawnStates() => OnClearAllDrawnStates?.Invoke();
     // Trigger Methods - Betting
     public static void TriggerBetChanged(float bet) => OnBetChanged?.Invoke(bet);
     public static void TriggerAutoBetRoundsChanged(int rounds) => OnAutoBetRoundsChanged?.Invoke(rounds);

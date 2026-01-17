@@ -21,7 +21,7 @@ public interface IBackendService
 public class DummyBackendService : IBackendService
 {
     private GameInitData _initData;
-    private float _balance = 10.0f;
+    private float _balance = 999.789f ;
     private System.Random _random = new System.Random();
 
     public bool IsConnected => true;

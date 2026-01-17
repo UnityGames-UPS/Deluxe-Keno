@@ -50,8 +50,6 @@ public class NumbersGridView : MonoBehaviour
         GameEvents.OnGameStarted += HandleGameStarted;
         GameEvents.OnBallDrawn += HandleBallDrawn;
         GameEvents.OnGameEnded += HandleGameEnded;
-
-        // NEW: Subscribe to visual update event
         GameEvents.OnNumberVisualUpdate += HandleNumberVisualUpdate;
     }
 
@@ -62,12 +60,9 @@ public class NumbersGridView : MonoBehaviour
         GameEvents.OnGameStarted -= HandleGameStarted;
         GameEvents.OnBallDrawn -= HandleBallDrawn;
         GameEvents.OnGameEnded -= HandleGameEnded;
-
-        // NEW: Unsubscribe from visual update event
         GameEvents.OnNumberVisualUpdate -= HandleNumberVisualUpdate;
     }
 
-    // NEW: Handle visual updates from GameController after validation
     private void HandleNumberVisualUpdate(int number, bool selected)
     {
         if (_numberButtons.TryGetValue(number, out NumberButton button))
@@ -101,6 +96,7 @@ public class NumbersGridView : MonoBehaviour
     {
         SetAllButtonsInteractable(false);
 
+        // Clear drawn/win states from previous round
         foreach (var kvp in _numberButtons)
             kvp.Value.ClearDrawnState();
     }
@@ -119,6 +115,9 @@ public class NumbersGridView : MonoBehaviour
     private void HandleGameEnded()
     {
         SetAllButtonsInteractable(true);
+
+        // DON'T clear drawn/win states automatically
+        // Let them stay visible until user clicks on the button
     }
 
     private void SetAllButtonsInteractable(bool interactable)
