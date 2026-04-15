@@ -1,5 +1,9 @@
 fileFormatVersion: 2
+<<<<<<< HEAD
 guid: 1f88d9db69e9245a18226e74ce155b1c
+=======
+guid: e5a7368af874d4131a74453fb8119c89
+>>>>>>> 25dee21 (feat: B2B Changes)
 folderAsset: yes
 DefaultImporter:
   externalObjects: {}
