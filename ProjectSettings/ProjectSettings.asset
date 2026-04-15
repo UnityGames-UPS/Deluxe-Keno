@@ -760,7 +760,11 @@ PlayerSettings:
   webGLDebugSymbols: 0
   webGLEmscriptenArgs: 
   webGLModulesDirectory: 
+<<<<<<< HEAD
   webGLTemplate: PROJECT:custom
+=======
+  webGLTemplate: PROJECT:AWT
+>>>>>>> 25dee21 (feat: B2B Changes)
   webGLAnalyzeBuildSize: 0
   webGLUseEmbeddedResources: 0
   webGLCompressionFormat: 0
