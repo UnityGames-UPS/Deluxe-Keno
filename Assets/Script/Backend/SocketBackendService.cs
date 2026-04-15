@@ -205,9 +205,20 @@ public class SocketBackendService : IBackendService
         Debug.LogError($"[Socket] Error: {error}");
         GameEvents.TriggerConnectionError($"Connection error: {error}");
 
-#if UNITY_WEBGL && !UNITY_EDITOR
-        JSBridge.SendMessage("error");
-#endif
+        if (!string.IsNullOrEmpty(error.message) && error.message.Contains("Session expired"))
+          {
+            Debug.LogWarning("Session expired detected");
+            OnDisconnected();
+      #if UNITY_WEBGL && !UNITY_EDITOR
+              JSManager.SendCustomMessage("session_expired");
+      #endif
+          }
+          else
+          {
+      #if UNITY_WEBGL && !UNITY_EDITOR
+              JSManager.SendCustomMessage("error");
+      #endif
+          }
     }
 
     private void OnGameInit(string data)
