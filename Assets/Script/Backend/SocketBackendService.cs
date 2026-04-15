@@ -210,13 +210,13 @@ public class SocketBackendService : IBackendService
             Debug.LogWarning("Session expired detected");
             OnDisconnected();
       #if UNITY_WEBGL && !UNITY_EDITOR
-              JSManager.SendCustomMessage("session_expired");
+              JSBridge.SendMessage("session_expired");
       #endif
           }
           else
           {
       #if UNITY_WEBGL && !UNITY_EDITOR
-              JSManager.SendCustomMessage("error");
+              JSBridge.SendMessage("error");
       #endif
           }
     }
