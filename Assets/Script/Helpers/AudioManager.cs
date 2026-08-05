@@ -4,20 +4,8 @@ using System.Collections.Generic;
 public class AudioManager : MonoBehaviour
 {
     #region Singleton
-    private static AudioManager _instance;
-    public static AudioManager Instance
-    {
-        get
-        {
-            if (_instance == null)
-            {
-                GameObject go = new GameObject("AudioManager");
-                _instance = go.AddComponent<AudioManager>();
-                DontDestroyOnLoad(go);
-            }
-            return _instance;
-        }
-    }
+    internal static AudioManager Instance;
+
     #endregion
 
     #region Audio Clips
@@ -75,13 +63,8 @@ public class AudioManager : MonoBehaviour
 
     private void Awake()
     {
-        if (_instance != null && _instance != this)
-        {
-            Destroy(gameObject);
-            return;
-        }
-        _instance = this;
-        DontDestroyOnLoad(gameObject);
+      
+        Instance = this;
 
         InitializeAudioSources();
         LoadSettings();
@@ -149,6 +132,7 @@ public class AudioManager : MonoBehaviour
     internal void SetMuteAll(bool forceMute)
     {
         if (_isBeingDestroyed) return;
+        _isApplicationFocused = !forceMute;
         if (forceMute == _isForceMuted) return; // Reentrancy guard: don't re-capture or re-restore
         _isForceMuted = forceMute;
 
@@ -182,23 +166,6 @@ public class AudioManager : MonoBehaviour
         }
         return sources;
     }
-
-    #region Focus Handling
-    private void OnApplicationFocus(bool hasFocus)
-    {
-        if (_isBeingDestroyed) return;
-        _isApplicationFocused = hasFocus;
-        Debug.Log($"[AudioManager] OnApplicationFocus: {hasFocus}");
-        SetMuteAll(!hasFocus);
-    }
-
-    private void OnApplicationPause(bool pauseStatus)
-    {
-        if (_isBeingDestroyed) return;
-        Debug.Log($"[AudioManager] OnApplicationPause: {pauseStatus}");
-        SetMuteAll(pauseStatus);
-    }
-    #endregion
 
     #region Public Audio Controls
     public void PlayBackgroundMusic()
@@ -328,7 +295,7 @@ public class AudioManager : MonoBehaviour
     {
         _isBeingDestroyed = true;
 
-        if (_instance == this)
+        if (Instance == this)
         {
             StopBackgroundMusic();
 
@@ -340,7 +307,7 @@ public class AudioManager : MonoBehaviour
 
             _bgMusicSource = null;
             _sfxSource = null;
-            _instance = null;
+            Instance = null;
         }
     }
     #endregion

@@ -95,21 +95,43 @@ public class UIController : MonoBehaviour
     private List<GameObject> _dynamicBetSelectedImages = new List<GameObject>();
     private float[] _availableBets;
 
+    private bool _isVisibilityRegistered = false;
+
     private void Awake()
     {
-        if (JSBridge.Instance != null)
-        {
-            JSBridge.Instance.RegisterVisibilityListener(gameObject.name);
-        }
+        RegisterVisibilityBridge();
     }
 
     private void Start()
     {
+        RegisterVisibilityBridge();
         IsQuitSelf = false;
         InitializeUI();
         SubscribeToEvents();
         SetupButtonListeners();
         AudioManager.Instance.PlayBackgroundMusic();
+    }
+
+    private void RegisterVisibilityBridge()
+    {
+        if (_isVisibilityRegistered) return;
+
+        JSBridge jsBridge = JSBridge.Instance;
+        if (jsBridge == null)
+        {
+            jsBridge = FindObjectOfType<JSBridge>();
+        }
+
+        if (jsBridge != null)
+        {
+            Debug.Log($"[UIController] Registering JS visibility listener for '{gameObject.name}'");
+            jsBridge.RegisterVisibilityListener(gameObject.name);
+            _isVisibilityRegistered = true;
+        }
+        else
+        {
+            Debug.LogWarning($"[UIController] JSBridge instance not found during visibility registration attempt.");
+        }
     }
 
     private void OnDestroy()

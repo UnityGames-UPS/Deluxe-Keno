@@ -31,6 +31,11 @@ public class JSBridge : MonoBehaviour
         Instance = this;
     }
 
+    private void Start()
+    {
+        RegisterVisibilityListener(gameObject.name);
+    }
+
     private void OnEnable()
     {
 #if UNITY_WEBGL && !UNITY_EDITOR
@@ -104,6 +109,7 @@ public class JSBridge : MonoBehaviour
     {
         bool focused = value == "1";
         Debug.Log($"[JSBridge] OnFocusChanged received: {value} (focused: {focused})");
+        AudioManager.Instance?.SetMuteAll(!focused);
         if (GameController.Instance != null)
         {
             GameController.Instance.HandleFocusChange(focused);

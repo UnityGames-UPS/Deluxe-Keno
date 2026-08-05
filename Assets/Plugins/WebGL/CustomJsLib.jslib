@@ -54,6 +54,7 @@ mergeInto(LibraryManager.library, {
 
   RegisterVisibilityChangeListener: function(gameObjectNamePtr) {
     var gameObjectName = UTF8ToString(gameObjectNamePtr);
+    console.log('[JS] RegisterVisibilityChangeListener called for GameObject:', gameObjectName);
 
     function setUnityAudioSuspended(suspended) {
         try {
@@ -70,15 +71,14 @@ mergeInto(LibraryManager.library, {
     }
 
     function sendFocusToUnity(focused) {
+        console.log('[JS] sendFocusToUnity - focused:', focused);
         setUnityAudioSuspended(!focused);
         try {
             var value = focused ? '1' : '0';
             if (typeof SendMessage === 'function') {
                 SendMessage(gameObjectName, 'OnFocusChanged', value);
-                if (gameObjectName !== 'SocketManager') SendMessage('SocketManager', 'OnFocusChanged', value);
             } else if (typeof unityInstance !== 'undefined' && unityInstance && unityInstance.SendMessage) {
                 unityInstance.SendMessage(gameObjectName, 'OnFocusChanged', value);
-                if (gameObjectName !== 'SocketManager') unityInstance.SendMessage('SocketManager', 'OnFocusChanged', value);
             }
         } catch (err) {
             console.error('[JS] Error sending focus message to Unity:', err);
@@ -87,10 +87,17 @@ mergeInto(LibraryManager.library, {
 
     window._unityVisibilityCallback = function() {
         var hidden = document.hidden || document.webkitHidden;
+        console.log('[JS] App visibilitychange - hidden:', hidden);
         sendFocusToUnity(!hidden);
     };
-    window._unityWindowBlurCallback  = function() { sendFocusToUnity(false); };
-    window._unityWindowFocusCallback = function() { sendFocusToUnity(true); };
+    window._unityWindowBlurCallback  = function() {
+        console.log('[JS] App unfocus (window blur)');
+        sendFocusToUnity(false);
+    };
+    window._unityWindowFocusCallback = function() {
+        console.log('[JS] App focus (window focus)');
+        sendFocusToUnity(true);
+    };
 
     document.removeEventListener('visibilitychange',       window._unityVisibilityCallback);
     document.removeEventListener('webkitvisibilitychange', window._unityVisibilityCallback);

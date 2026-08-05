@@ -161,11 +161,6 @@ public class GameController : MonoBehaviour
     private Coroutine _focusCheckRoutine;
     private float _maxBackgroundTime = 60f;
 
-    private void OnApplicationFocus(bool focus)
-    {
-        HandleFocusChange(focus);
-    }
-
     public void OnFocusChanged(string value)
     {
         bool focused = value == "1";
@@ -174,6 +169,7 @@ public class GameController : MonoBehaviour
 
     public void HandleFocusChange(bool focus)
     {
+        Debug.Log($"[GameController] HandleFocusChange - focus: {focus}");
         _hasFocus = focus;
         AudioManager.Instance?.SetMuteAll(!focus);
         _backendService?.HandleFocusChange(focus);
