@@ -95,6 +95,14 @@ public class UIController : MonoBehaviour
     private List<GameObject> _dynamicBetSelectedImages = new List<GameObject>();
     private float[] _availableBets;
 
+    private void Awake()
+    {
+        if (JSBridge.Instance != null)
+        {
+            JSBridge.Instance.RegisterVisibilityListener(gameObject.name);
+        }
+    }
+
     private void Start()
     {
         IsQuitSelf = false;
@@ -943,6 +951,16 @@ public class UIController : MonoBehaviour
             _disconnectPopupArea.transform.DOKill(true);
         if (_quitGamePopupArea != null && _quitGamePopupArea.transform != null)
             _quitGamePopupArea.transform.DOKill(true);
+    }
+    #endregion
+
+    #region WebGL Focus Handler (Check 2)
+    public void OnFocusChanged(string value)
+    {
+        bool focused = value == "1";
+        Debug.Log($"[UIController] UNITY FOCUS CHANGED: {value} (focused: {focused})");
+        AudioManager.Instance?.SetMuteAll(!focused);
+        GameController.Instance?.HandleFocusChange(focused);
     }
     #endregion
 }

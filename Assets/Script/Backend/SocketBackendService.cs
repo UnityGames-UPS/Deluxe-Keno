@@ -34,6 +34,13 @@ public class SocketBackendService : IBackendService
     private Action<GameInitData> _onInitialized;
     private Action<GameResultData> _onResult;
 
+    #region Focus & Background Timeout Fields
+    private bool _hasFocus = true;
+    private float _focusLostTime = 0f;
+    private Coroutine _focusCheckRoutine;
+    private float _maxBackgroundTime = 60f;
+    #endregion
+
     public bool IsConnected => _isConnected && _socket != null && _socket.IsOpen;
 
     public SocketBackendService(string serverURL, string nameSpace, string gameID, string editorToken)
@@ -163,6 +170,7 @@ public class SocketBackendService : IBackendService
         _socket.On<string>("internalError", OnInternalError);
         _socket.On<string>("alert", OnAlert);
         _socket.On<string>("AnotherDevice", OnAnotherDevice);
+        _socket.On<string>("balance:sync", OnBalanceSync);
     }
 
     private void OnConnected(ConnectResponse resp)
@@ -282,6 +290,73 @@ public class SocketBackendService : IBackendService
         GameEvents.TriggerAnotherDeviceLogin();
         Close();
     }
+
+    private void OnBalanceSync(string data)
+    {
+        try
+        {
+            BalanceSyncPayload syncPayload = JsonUtility.FromJson<BalanceSyncPayload>(data);
+            if (syncPayload == null) return;
+
+            Debug.Log($"[Socket] balance:sync received: {syncPayload.balance}");
+            if (GameController.Instance != null && GameController.Instance.GetModel() != null)
+            {
+                GameController.Instance.GetModel().PlayerData.balance = syncPayload.balance;
+            }
+            GameEvents.TriggerBalanceUpdated(syncPayload.balance);
+        }
+        catch (Exception e)
+        {
+            Debug.LogWarning($"[Socket] BalanceSync parse error: {e.Message}");
+        }
+    }
+
+    #region 60-Second Background Timeout (Check 4)
+    public void HandleFocusChange(bool focus)
+    {
+        _hasFocus = focus;
+
+        if (!focus)
+        {
+            _focusLostTime = Time.time;
+            if (_focusCheckRoutine == null)
+            {
+                _focusCheckRoutine = CoroutineRunner.Instance.StartCoroutine(FocusTimeoutCheck());
+            }
+        }
+        else
+        {
+            if (_focusCheckRoutine != null)
+            {
+                CoroutineRunner.Instance.StopCoroutine(_focusCheckRoutine);
+                _focusCheckRoutine = null;
+            }
+        }
+    }
+
+    private IEnumerator FocusTimeoutCheck()
+    {
+        while (!_hasFocus)
+        {
+            if (Time.time - _focusLostTime >= _maxBackgroundTime)
+            {
+                Debug.LogWarning("[SOCKET] Background timeout — closing connection");
+                _isConnected = false;
+                StopHeartbeat();
+
+                Close();
+
+                GameEvents.TriggerConnectionLost();
+                _focusCheckRoutine = null;
+                yield break;
+            }
+
+            yield return new WaitForSecondsRealtime(1f);
+        }
+
+        _focusCheckRoutine = null;
+    }
+    #endregion
 
     private void StartHeartbeat()
     {

@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
@@ -13,6 +13,7 @@ public interface IBackendService
     void SendDrawRequest(float bet, List<int> picks, Action<GameResultData> onResult);
     bool IsConnected { get; }
     void Close();
+    void HandleFocusChange(bool focus);
 }
 
 /// <summary>
@@ -25,6 +26,8 @@ public class DummyBackendService : IBackendService
     private System.Random _random = new System.Random();
 
     public bool IsConnected => true;
+
+    public void HandleFocusChange(bool focus) { }
 
     public void Initialize(Action<GameInitData> onInitialized)
     {

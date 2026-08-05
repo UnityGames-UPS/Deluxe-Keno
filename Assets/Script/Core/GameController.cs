@@ -146,6 +146,11 @@ public class GameController : MonoBehaviour
     #endregion
 
     #region Platform-Accessible Methods
+    public void HandleFocusChange(bool focus)
+    {
+        _backendService?.HandleFocusChange(focus);
+    }
+
     public void CloseSocket()
     {
         StartCoroutine(CloseSocketCoroutine());

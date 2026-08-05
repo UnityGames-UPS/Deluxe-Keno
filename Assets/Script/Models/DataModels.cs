@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using UnityEngine;
 
@@ -142,6 +142,12 @@ public class DrawRequestPayload
 {
     public int betIndex;
     public List<int> picks;
+}
+
+[Serializable]
+public class BalanceSyncPayload
+{
+    public float balance;
 }
 
 #endregion

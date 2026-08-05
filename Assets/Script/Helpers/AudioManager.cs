@@ -66,7 +66,8 @@ public class AudioManager : MonoBehaviour
     #endregion
 
     #region Focus Management
-    private bool _wasMusicPlayingBeforePause = false;
+    private bool _isForceMuted = false;
+    private readonly Dictionary<AudioSource, bool> _preFocusMuteState = new Dictionary<AudioSource, bool>();
     private bool _isApplicationFocused = true;
     #endregion
 
@@ -145,92 +146,57 @@ public class AudioManager : MonoBehaviour
             StopBackgroundMusic();
     }
 
-    #region Focus Handling - FIXED
-    private void OnApplicationFocus(bool hasFocus)
+    internal void SetMuteAll(bool forceMute)
     {
         if (_isBeingDestroyed) return;
+        if (forceMute == _isForceMuted) return; // Reentrancy guard: don't re-capture or re-restore
+        _isForceMuted = forceMute;
 
-        _isApplicationFocused = hasFocus;
-
-        if (hasFocus)
+        List<AudioSource> allSources = GetAllAudioSources();
+        foreach (var source in allSources)
         {
-            // Application gained focus
-            Debug.Log("[AudioManager] Application gained focus");
-
-            if (_wasMusicPlayingBeforePause && _musicEnabled)
+            if (source == null) continue;
+            if (forceMute)
             {
-                PlayBackgroundMusic();
-            }
-        }
-        else
-        {
-            // Application lost focus - STOP ALL AUDIO
-            Debug.Log("[AudioManager] Application lost focus - stopping audio");
-
-            if (_bgMusicSource != null && _bgMusicSource.isPlaying)
-            {
-                _wasMusicPlayingBeforePause = true;
-                _bgMusicSource.Pause();
+                _preFocusMuteState[source] = source.mute;
+                source.mute = true;
             }
             else
             {
-                _wasMusicPlayingBeforePause = false;
+                source.mute = _preFocusMuteState.TryGetValue(source, out bool prevMuted) ? prevMuted : false;
             }
-
-            StopAllSFX();
         }
+    }
+
+    private List<AudioSource> GetAllAudioSources()
+    {
+        List<AudioSource> sources = new List<AudioSource>();
+        if (_bgMusicSource != null) sources.Add(_bgMusicSource);
+        if (_sfxSource != null) sources.Add(_sfxSource);
+        if (_sfxPool != null)
+        {
+            foreach (var s in _sfxPool)
+            {
+                if (s != null) sources.Add(s);
+            }
+        }
+        return sources;
+    }
+
+    #region Focus Handling
+    private void OnApplicationFocus(bool hasFocus)
+    {
+        if (_isBeingDestroyed) return;
+        _isApplicationFocused = hasFocus;
+        Debug.Log($"[AudioManager] OnApplicationFocus: {hasFocus}");
+        SetMuteAll(!hasFocus);
     }
 
     private void OnApplicationPause(bool pauseStatus)
     {
         if (_isBeingDestroyed) return;
-
-        if (pauseStatus)
-        {
-            // Application is pausing (mobile/background)
-            Debug.Log("[AudioManager] Application paused - stopping audio");
-
-            if (_bgMusicSource != null && _bgMusicSource.isPlaying)
-            {
-                _wasMusicPlayingBeforePause = true;
-                _bgMusicSource.Pause();
-            }
-            else
-            {
-                _wasMusicPlayingBeforePause = false;
-            }
-
-            StopAllSFX();
-        }
-        else
-        {
-            // Application is resuming
-            Debug.Log("[AudioManager] Application resumed");
-
-            if (_wasMusicPlayingBeforePause && _musicEnabled)
-            {
-                PlayBackgroundMusic();
-            }
-        }
-    }
-
-    private void StopAllSFX()
-    {
-        if (_sfxPool == null) return;
-
-        foreach (AudioSource source in _sfxPool)
-        {
-            if (source != null && source.isPlaying)
-            {
-                source.Stop();
-            }
-        }
-
-        // Also stop the main SFX source
-        if (_sfxSource != null && _sfxSource.isPlaying)
-        {
-            _sfxSource.Stop();
-        }
+        Debug.Log($"[AudioManager] OnApplicationPause: {pauseStatus}");
+        SetMuteAll(pauseStatus);
     }
     #endregion
 
@@ -323,6 +289,7 @@ public class AudioManager : MonoBehaviour
     #region Settings Controls
     public void ToggleSFX()
     {
+        _isForceMuted = false;
         _sfxEnabled = !_sfxEnabled;
         SaveSettings();
         GameEvents.TriggerAudioSettingsChanged();
@@ -330,6 +297,7 @@ public class AudioManager : MonoBehaviour
 
     public void ToggleMusic()
     {
+        _isForceMuted = false;
         _musicEnabled = !_musicEnabled;
         ApplySettings();
         SaveSettings();
@@ -338,6 +306,7 @@ public class AudioManager : MonoBehaviour
 
     public void SetSFXVolume(float volume)
     {
+        _isForceMuted = false;
         _sfxVolume = Mathf.Clamp01(volume);
         if (_sfxSource != null)
             _sfxSource.volume = _sfxVolume;
@@ -346,6 +315,7 @@ public class AudioManager : MonoBehaviour
 
     public void SetMusicVolume(float volume)
     {
+        _isForceMuted = false;
         _musicVolume = Mathf.Clamp01(volume);
         if (_bgMusicSource != null)
             _bgMusicSource.volume = _musicVolume;

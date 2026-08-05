@@ -25,6 +25,9 @@ public class JSBridge : MonoBehaviour
 
     [DllImport("__Internal")]
     private static extern void SendPostMessage(string message);
+
+    [DllImport("__Internal")]
+    private static extern void RegisterVisibilityChangeListener(string gameObjectName);
 #endif
 
     private static string _authToken;
@@ -81,6 +84,16 @@ public class JSBridge : MonoBehaviour
     {
 #if UNITY_WEBGL && !UNITY_EDITOR
         SendPostMessage(message);
+#endif
+    }
+
+    public void RegisterVisibilityListener(string gameObjectName)
+    {
+#if UNITY_WEBGL && !UNITY_EDITOR
+        Debug.Log($"[JS] Registering visibility change listener on '{gameObjectName}'");
+        RegisterVisibilityChangeListener(gameObjectName);
+#else
+        Debug.Log("[JS] Visibility listener not registered (editor mode)");
 #endif
     }
 
