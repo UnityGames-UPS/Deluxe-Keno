@@ -64,7 +64,7 @@ public class DummyBackendService : IBackendService
 
     public void SendDrawRequest(float bet, List<int> picks, Action<GameResultData> onResult)
     {
-        CoroutineRunner.Instance.StartCoroutine(SimulateDrawRequest(bet, picks, onResult));
+        CoroutineRunner.Instance?.StartCoroutine(SimulateDrawRequest(bet, picks, onResult));
     }
 
     private IEnumerator SimulateDrawRequest(float bet, List<int> picks, Action<GameResultData> onResult)
@@ -131,16 +131,36 @@ public class DummyBackendService : IBackendService
 public class CoroutineRunner : MonoBehaviour
 {
     private static CoroutineRunner _instance;
+    private static bool _isQuitting = false;
+
+    public static bool IsQuitting => _isQuitting;
+
+    private void OnApplicationQuit()
+    {
+        _isQuitting = true;
+    }
+
+    private void OnDestroy()
+    {
+        _isQuitting = true;
+    }
 
     public static CoroutineRunner Instance
     {
         get
         {
+            if (_isQuitting)
+                return null;
+
             if (_instance == null)
             {
-                GameObject go = new GameObject("CoroutineRunner");
-                _instance = go.AddComponent<CoroutineRunner>();
-                DontDestroyOnLoad(go);
+                _instance = FindObjectOfType<CoroutineRunner>();
+                if (_instance == null && !_isQuitting)
+                {
+                    GameObject go = new GameObject("CoroutineRunner");
+                    _instance = go.AddComponent<CoroutineRunner>();
+                    DontDestroyOnLoad(go);
+                }
             }
             return _instance;
         }

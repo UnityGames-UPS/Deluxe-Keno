@@ -33,6 +33,10 @@ mergeInto(LibraryManager.library, {
 
             if (typeof SendMessage === 'function') {
               SendMessage('SocketManager', 'ReceiveAuthToken', combinedData);
+              SendMessage('JSBridge', 'ReceiveAuthToken', combinedData);
+            } else if (typeof unityInstance !== 'undefined' && unityInstance && unityInstance.SendMessage) {
+              unityInstance.SendMessage('SocketManager', 'ReceiveAuthToken', combinedData);
+              unityInstance.SendMessage('JSBridge', 'ReceiveAuthToken', combinedData);
             }
           }
           window.ReactNativeWebView.postMessage(message);
@@ -71,8 +75,10 @@ mergeInto(LibraryManager.library, {
             var value = focused ? '1' : '0';
             if (typeof SendMessage === 'function') {
                 SendMessage(gameObjectName, 'OnFocusChanged', value);
+                if (gameObjectName !== 'SocketManager') SendMessage('SocketManager', 'OnFocusChanged', value);
             } else if (typeof unityInstance !== 'undefined' && unityInstance && unityInstance.SendMessage) {
                 unityInstance.SendMessage(gameObjectName, 'OnFocusChanged', value);
+                if (gameObjectName !== 'SocketManager') unityInstance.SendMessage('SocketManager', 'OnFocusChanged', value);
             }
         } catch (err) {
             console.error('[JS] Error sending focus message to Unity:', err);

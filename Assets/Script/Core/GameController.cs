@@ -5,16 +5,8 @@ using UnityEngine;
 public class GameController : MonoBehaviour
 {
     #region Singleton
-    private static GameController _instance;
-    public static GameController Instance
-    {
-        get
-        {
-            if (_instance == null)
-                _instance = FindObjectOfType<GameController>();
-            return _instance;
-        }
-    }
+    internal static GameController Instance;
+ 
     #endregion
 
     #region Configuration
@@ -37,21 +29,39 @@ public class GameController : MonoBehaviour
     private Coroutine _autoPlayCoroutine;
     #endregion
 
-    #region Public Accessors
+    #region Public Accessors & WebGL Receivers
     public GameModel GetModel() => _model;
     public bool IsInitialized => _isInitialized;
+
+    /// <summary>
+    /// WebGL Platform receiver for SendMessage("SocketManager", "ReceiveAuthToken", jsonData)
+    /// </summary>
+    public void ReceiveAuthToken(string jsonData)
+    {
+        Debug.Log($"[GameController] ReceiveAuthToken received on SocketManager: {jsonData}");
+        if (JSBridge.Instance != null)
+        {
+            JSBridge.Instance.ReceiveAuthToken(jsonData);
+        }
+        else
+        {
+            try
+            {
+                AuthTokenData data = JsonUtility.FromJson<AuthTokenData>(jsonData);
+                JSBridge.SetAuthTokenData(data.cookie, data.socketURL, data.nameSpace);
+            }
+            catch (System.Exception ex)
+            {
+                Debug.LogError($"[GameController] Failed to parse ReceiveAuthToken: {ex.Message}");
+            }
+        }
+    }
     #endregion
 
     #region Unity Lifecycle
     private void Awake()
     {
-        if (_instance != null && _instance != this)
-        {
-            Destroy(gameObject);
-            return;
-        }
-        _instance = this;
-        DontDestroyOnLoad(gameObject);
+        Instance = this;
 
         EnableRaycastBlocker();
     }
@@ -63,7 +73,7 @@ public class GameController : MonoBehaviour
 
     private void OnDestroy()
     {
-        if (_instance == this)
+        if (Instance == this)
             Cleanup();
     }
     #endregion
@@ -145,11 +155,95 @@ public class GameController : MonoBehaviour
     }
     #endregion
 
-    #region Platform-Accessible Methods
+    #region Platform & Focus Management (Check 4)
+    private bool _hasFocus = true;
+    private float _focusLostTime = 0f;
+    private Coroutine _focusCheckRoutine;
+    private float _maxBackgroundTime = 60f;
+
+    private void OnApplicationFocus(bool focus)
+    {
+        HandleFocusChange(focus);
+    }
+
+    public void OnFocusChanged(string value)
+    {
+        bool focused = value == "1";
+        HandleFocusChange(focused);
+    }
+
     public void HandleFocusChange(bool focus)
     {
+        _hasFocus = focus;
+        AudioManager.Instance?.SetMuteAll(!focus);
         _backendService?.HandleFocusChange(focus);
+
+        if (!focus)
+        {
+            if (_focusLostTime <= 0f)
+            {
+                _focusLostTime = Time.unscaledTime;
+            }
+            if (_focusCheckRoutine == null)
+            {
+                _focusCheckRoutine = StartCoroutine(FocusTimeoutCheck());
+            }
+        }
+        else
+        {
+            float elapsed = _focusLostTime > 0f ? Time.unscaledTime - _focusLostTime : 0f;
+
+            if (_focusLostTime > 0f && elapsed >= _maxBackgroundTime)
+            {
+                TriggerBackgroundTimeout();
+                return;
+            }
+
+            _focusLostTime = 0f;
+            if (_focusCheckRoutine != null)
+            {
+                StopCoroutine(_focusCheckRoutine);
+                _focusCheckRoutine = null;
+            }
+        }
     }
+
+    private IEnumerator FocusTimeoutCheck()
+    {
+        while (!_hasFocus && !CoroutineRunner.IsQuitting)
+        {
+            float elapsed = _focusLostTime > 0f ? Time.unscaledTime - _focusLostTime : 0f;
+
+            if (_focusLostTime > 0f && elapsed >= _maxBackgroundTime)
+            {
+                TriggerBackgroundTimeout();
+                yield break;
+            }
+
+            yield return new WaitForSecondsRealtime(1f);
+        }
+
+        _focusCheckRoutine = null;
+    }
+
+    private void TriggerBackgroundTimeout()
+    {
+        if (_focusCheckRoutine != null)
+        {
+            StopCoroutine(_focusCheckRoutine);
+            _focusCheckRoutine = null;
+        }
+
+        _focusLostTime = 0f;
+
+        if (_backendService != null)
+        {
+            _backendService.Close();
+        }
+
+        GameEvents.TriggerConnectionLost();
+    }
+
 
     public void CloseSocket()
     {

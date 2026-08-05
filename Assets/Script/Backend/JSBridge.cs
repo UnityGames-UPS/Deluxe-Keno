@@ -3,21 +3,7 @@ using UnityEngine;
 
 public class JSBridge : MonoBehaviour
 {
-    private static JSBridge _instance;
-
-    public static JSBridge Instance
-    {
-        get
-        {
-            if (_instance == null)
-            {
-                GameObject go = new GameObject("JSBridge");
-                _instance = go.AddComponent<JSBridge>();
-                DontDestroyOnLoad(go);
-            }
-            return _instance;
-        }
-    }
+    internal static JSBridge Instance;
 
 #if UNITY_WEBGL && !UNITY_EDITOR
     [DllImport("__Internal")]
@@ -42,13 +28,7 @@ public class JSBridge : MonoBehaviour
 
     private void Awake()
     {
-        if (_instance != null && _instance != this)
-        {
-            Destroy(gameObject);
-            return;
-        }
-        _instance = this;
-        DontDestroyOnLoad(gameObject);
+        Instance = this;
     }
 
     private void OnEnable()
@@ -112,8 +92,27 @@ public class JSBridge : MonoBehaviour
         SendMessage("error");
     }
 
+    public static void SetAuthTokenData(string cookie, string socketURL, string nameSpace)
+    {
+        _authToken = cookie;
+        _socketURL = socketURL;
+        _namespace = nameSpace;
+        _hasAuthToken = true;
+    }
+
+    public void OnFocusChanged(string value)
+    {
+        bool focused = value == "1";
+        Debug.Log($"[JSBridge] OnFocusChanged received: {value} (focused: {focused})");
+        if (GameController.Instance != null)
+        {
+            GameController.Instance.HandleFocusChange(focused);
+        }
+    }
+
     public void ReceiveAuthToken(string jsonData)
     {
+        Debug.Log($"[JSBridge] ReceiveAuthToken received: {jsonData}");
         try
         {
             AuthTokenData data = JsonUtility.FromJson<AuthTokenData>(jsonData);
@@ -122,8 +121,9 @@ public class JSBridge : MonoBehaviour
             _namespace = data.nameSpace;
             _hasAuthToken = true;
         }
-        catch (System.Exception)
+        catch (System.Exception ex)
         {
+            Debug.LogError($"[JSBridge] ReceiveAuthToken error: {ex.Message}");
             _hasAuthToken = false;
         }
     }

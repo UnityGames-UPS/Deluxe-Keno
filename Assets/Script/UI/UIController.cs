@@ -615,7 +615,8 @@ public class UIController : MonoBehaviour
     #region Connection Popup Management
     private void ShowReconnectPopup()
     {
-        _reconnectPopupMainPanel?.SetActive(true);
+        if (_reconnectPopupMainPanel != null)
+            _reconnectPopupMainPanel.SetActive(true);
         if (_reconnectPopupArea != null)
         {
             _reconnectPopupArea.SetActive(true);
@@ -627,17 +628,23 @@ public class UIController : MonoBehaviour
     {
         if (_reconnectPopupArea != null)
         {
-            AnimatePopupHide(_reconnectPopupArea, () => _reconnectPopupMainPanel?.SetActive(false));
+            AnimatePopupHide(_reconnectPopupArea, () => 
+            {
+                if (_reconnectPopupMainPanel != null)
+                    _reconnectPopupMainPanel.SetActive(false);
+            });
         }
         else
         {
-            _reconnectPopupMainPanel?.SetActive(false);
+            if (_reconnectPopupMainPanel != null)
+                _reconnectPopupMainPanel.SetActive(false);
         }
     }
 
     private void ShowDisconnectPopup()
     {
-        _disconnectPopupMainPanel?.SetActive(true);
+        if (_disconnectPopupMainPanel != null)
+            _disconnectPopupMainPanel.SetActive(true);
         if (_disconnectPopupArea != null)
         {
             _disconnectPopupArea.SetActive(true);
@@ -649,11 +656,16 @@ public class UIController : MonoBehaviour
     {
         if (_disconnectPopupArea != null)
         {
-            AnimatePopupHide(_disconnectPopupArea, () => _disconnectPopupMainPanel?.SetActive(false));
+            AnimatePopupHide(_disconnectPopupArea, () => 
+            {
+                if (_disconnectPopupMainPanel != null)
+                    _disconnectPopupMainPanel.SetActive(false);
+            });
         }
         else
         {
-            _disconnectPopupMainPanel?.SetActive(false);
+            if (_disconnectPopupMainPanel != null)
+                _disconnectPopupMainPanel.SetActive(false);
         }
     }
 
@@ -665,12 +677,14 @@ public class UIController : MonoBehaviour
 
     private void HandleConnectionLost()
     {
+        if (this == null || !gameObject.activeInHierarchy || CoroutineRunner.IsQuitting) return;
         if (!IsQuitSelf)
             ShowDisconnectPopup();
     }
 
     private void HandleConnectionRestored()
     {
+        if (this == null || CoroutineRunner.IsQuitting) return;
         CloseReconnectPopup();
         CloseDisconnectPopup();
     }
@@ -955,6 +969,7 @@ public class UIController : MonoBehaviour
     #endregion
 
     #region WebGL Focus Handler (Check 2)
+
     public void OnFocusChanged(string value)
     {
         bool focused = value == "1";

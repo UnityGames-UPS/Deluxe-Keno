@@ -9,8 +9,6 @@ public class SocketBackendService : IBackendService
 {
     private const float PING_INTERVAL = 2f;
     private const int MAX_MISSED_PONGS = 15;
-    private const int MAX_RECONNECT_ATTEMPTS = 5;
-    private const float RECONNECT_DELAY = 2f;
     private const float AUTH_TOKEN_TIMEOUT = 20f;
 
     private readonly string _serverURL;
@@ -24,7 +22,7 @@ public class SocketBackendService : IBackendService
 
     private bool _isConnected;
     private bool _hasEverConnected;
-    private int _reconnectAttempts;
+    private bool _isExiting;
 
     private Coroutine _pingRoutine;
     private float _lastPongTime;
@@ -57,7 +55,7 @@ public class SocketBackendService : IBackendService
         _onInitialized = onInitialized;
 
 #if UNITY_WEBGL && !UNITY_EDITOR
-        CoroutineRunner.Instance.StartCoroutine(InitializeWithWebGLAuth());
+        CoroutineRunner.Instance?.StartCoroutine(InitializeWithWebGLAuth());
 #else
         InitializeWithToken(_editorTestToken);
 #endif
@@ -101,7 +99,14 @@ public class SocketBackendService : IBackendService
 
         if (_manager != null)
         {
-            _manager.Close();
+            try
+            {
+                _manager.Close();
+            }
+            catch (Exception ex)
+            {
+                Debug.LogWarning($"[Socket] Close error: {ex.Message}");
+            }
             _manager = null;
         }
 
@@ -176,7 +181,6 @@ public class SocketBackendService : IBackendService
     private void OnConnected(ConnectResponse resp)
     {
         _isConnected = true;
-        _reconnectAttempts = 0;
 
         if (_hasEverConnected)
         {
@@ -195,6 +199,12 @@ public class SocketBackendService : IBackendService
     {
         Debug.Log("[Socket] Disconnected");
         _isConnected = false;
+        StopHeartbeat();
+
+        if (_isExiting || CoroutineRunner.IsQuitting)
+        {
+            return;
+        }
 
         UIController uiManager = UnityEngine.Object.FindObjectOfType<UIController>();
         bool isUserQuitting = (uiManager != null && uiManager.IsQuitSelf);
@@ -202,10 +212,7 @@ public class SocketBackendService : IBackendService
         if (!isUserQuitting)
         {
             GameEvents.TriggerConnectionLost();
-            AttemptReconnection();
         }
-
-        StopHeartbeat();
     }
 
     private void OnError(Error error)
@@ -311,64 +318,24 @@ public class SocketBackendService : IBackendService
         }
     }
 
-    #region 60-Second Background Timeout (Check 4)
+    #region Focus Handler
     public void HandleFocusChange(bool focus)
     {
         _hasFocus = focus;
-
-        if (!focus)
-        {
-            _focusLostTime = Time.time;
-            if (_focusCheckRoutine == null)
-            {
-                _focusCheckRoutine = CoroutineRunner.Instance.StartCoroutine(FocusTimeoutCheck());
-            }
-        }
-        else
-        {
-            if (_focusCheckRoutine != null)
-            {
-                CoroutineRunner.Instance.StopCoroutine(_focusCheckRoutine);
-                _focusCheckRoutine = null;
-            }
-        }
-    }
-
-    private IEnumerator FocusTimeoutCheck()
-    {
-        while (!_hasFocus)
-        {
-            if (Time.time - _focusLostTime >= _maxBackgroundTime)
-            {
-                Debug.LogWarning("[SOCKET] Background timeout — closing connection");
-                _isConnected = false;
-                StopHeartbeat();
-
-                Close();
-
-                GameEvents.TriggerConnectionLost();
-                _focusCheckRoutine = null;
-                yield break;
-            }
-
-            yield return new WaitForSecondsRealtime(1f);
-        }
-
-        _focusCheckRoutine = null;
     }
     #endregion
 
     private void StartHeartbeat()
     {
         StopHeartbeat();
-        _pingRoutine = CoroutineRunner.Instance.StartCoroutine(HeartbeatLoop());
+        _pingRoutine = CoroutineRunner.Instance?.StartCoroutine(HeartbeatLoop());
     }
 
     private void StopHeartbeat()
     {
         if (_pingRoutine != null)
         {
-            CoroutineRunner.Instance.StopCoroutine(_pingRoutine);
+            CoroutineRunner.Instance?.StopCoroutine(_pingRoutine);
             _pingRoutine = null;
         }
     }
@@ -420,31 +387,6 @@ public class SocketBackendService : IBackendService
 
             yield return new WaitForSeconds(PING_INTERVAL);
         }
-    }
-
-    private void AttemptReconnection()
-    {
-        if (_reconnectAttempts >= MAX_RECONNECT_ATTEMPTS)
-        {
-            Debug.LogError($"[Socket] Max reconnection attempts ({MAX_RECONNECT_ATTEMPTS}) reached");
-            GameEvents.TriggerConnectionError("Unable to reconnect to server");
-            return;
-        }
-
-        _reconnectAttempts++;
-        CoroutineRunner.Instance.StartCoroutine(ReconnectAfterDelay());
-    }
-
-    private IEnumerator ReconnectAfterDelay()
-    {
-        float delay = RECONNECT_DELAY * _reconnectAttempts;
-        yield return new WaitForSeconds(delay);
-
-        UIController uiManager = UnityEngine.Object.FindObjectOfType<UIController>();
-        bool isUserQuitting = (uiManager != null && uiManager.IsQuitSelf);
-
-        if (_manager != null && !_isConnected && !isUserQuitting)
-            _manager.Open();
     }
 
     private void EmitEvent(string eventName, string json = null)
