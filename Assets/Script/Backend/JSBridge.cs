@@ -7,13 +7,16 @@ public class JSBridge : MonoBehaviour
 
 #if UNITY_WEBGL && !UNITY_EDITOR
     [DllImport("__Internal")]
-    private static extern void SendLogToReactNative(string message);
-
-    [DllImport("__Internal")]
     private static extern void SendPostMessage(string message);
 
     [DllImport("__Internal")]
     private static extern void RegisterVisibilityChangeListener(string gameObjectName);
+
+    [DllImport("__Internal")]
+    private static extern void RegisterResizeListener(string gameObjectName, string methodName);
+
+    [DllImport("__Internal")]
+    private static extern void RegisterTokenListener(string gameObjectName, string methodName);
 #endif
 
     private static string _authToken;
@@ -34,33 +37,16 @@ public class JSBridge : MonoBehaviour
     private void Start()
     {
         RegisterVisibilityListener(gameObject.name);
+        RegisterDimensionsListener();
     }
-
-    private void OnEnable()
-    {
-#if UNITY_WEBGL && !UNITY_EDITOR
-        Application.logMessageReceived += HandleLog;
-#endif
-    }
-
-    private void OnDisable()
-    {
-#if UNITY_WEBGL && !UNITY_EDITOR
-        Application.logMessageReceived -= HandleLog;
-#endif
-    }
-
-#if UNITY_WEBGL && !UNITY_EDITOR
-    private void HandleLog(string logString, string stackTrace, LogType type)
-    {
-        string formattedMessage = $"[{type}] {logString}";
-        SendLogToReactNative(formattedMessage);
-    }
-#endif
 
     public static void RequestAuthToken()
     {
 #if UNITY_WEBGL && !UNITY_EDITOR
+        if (Instance != null)
+        {
+            Instance.RegisterAuthTokenListener(Instance.gameObject.name, "ReceiveAuthToken");
+        }
         SendPostMessage("authToken");
 #endif
     }
@@ -79,6 +65,28 @@ public class JSBridge : MonoBehaviour
         RegisterVisibilityChangeListener(gameObjectName);
 #else
         Debug.Log("[JS] Visibility listener not registered (editor mode)");
+#endif
+    }
+
+    // Self-contained resize bridge: the page drives <OC_GO>.<OC_METHOD>("width,height") on its own resize.
+    public void RegisterDimensionsListener(string gameObjectName = "OC", string methodName = "SwitchDisplay")
+    {
+#if UNITY_WEBGL && !UNITY_EDITOR
+        Debug.Log($"[JS] Registering resize listener on '{gameObjectName}.{methodName}'");
+        RegisterResizeListener(gameObjectName, methodName);
+#else
+        Debug.Log($"[JS] Resize listener not registered ('{gameObjectName}.{methodName}', editor mode)");
+#endif
+    }
+
+    // Inbound auth: routes the host's "TokenReceived" message to gameObjectName.methodName(json).
+    public void RegisterAuthTokenListener(string gameObjectName, string methodName = "ReceiveAuthToken")
+    {
+#if UNITY_WEBGL && !UNITY_EDITOR
+        Debug.Log($"[JS] Registering token listener on '{gameObjectName}.{methodName}'");
+        RegisterTokenListener(gameObjectName, methodName);
+#else
+        Debug.Log($"[JS] Token listener not registered ('{gameObjectName}.{methodName}', editor mode)");
 #endif
     }
 
