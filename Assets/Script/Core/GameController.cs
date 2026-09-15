@@ -62,11 +62,11 @@ public class GameController : MonoBehaviour
     private void Awake()
     {
         Instance = this;
-
+        Debug.Log("Test LOG");
         EnableRaycastBlocker();
     }
 
-    void Start()
+    private void Start()
     {
         InitializeServices();
     }
@@ -83,10 +83,11 @@ public class GameController : MonoBehaviour
     {
         _model = new GameModel();
         _backendService = _useDummyBackend
-            ? (IBackendService)new DummyBackendService()
+            ? new DummyBackendService()
             : new SocketBackendService(_serverURL, _namespace, _gameID, _editorTestToken);
 
         SubscribeToEvents();
+        Debug.Log("Init");
         _backendService.Initialize(OnGameInitialized);
     }
 
@@ -259,7 +260,7 @@ public class GameController : MonoBehaviour
         yield return new WaitForSeconds(0.5f);
 
 #if UNITY_WEBGL && !UNITY_EDITOR
-        JSBridge.SendMessage("OnExit");
+        JSBridge.SendPostMessageToPlatform("OnExit");
 #endif
     }
     #endregion

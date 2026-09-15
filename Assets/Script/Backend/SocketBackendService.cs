@@ -53,12 +53,12 @@ public class SocketBackendService : IBackendService
     public void Initialize(Action<GameInitData> onInitialized)
     {
         _onInitialized = onInitialized;
-
 #if UNITY_WEBGL && !UNITY_EDITOR
         CoroutineRunner.Instance?.StartCoroutine(InitializeWithWebGLAuth());
 #else
         InitializeWithToken(_editorTestToken);
 #endif
+        Debug.Log("After Coroutine");
     }
 
     public void SendDrawRequest(float bet, List<int> picks, Action<GameResultData> onResult)
@@ -116,7 +116,11 @@ public class SocketBackendService : IBackendService
 
     private IEnumerator InitializeWithWebGLAuth()
     {
-        JSBridge.RequestAuthToken();
+        if (!JSBridge.RequestAuthToken())
+        {
+            GameEvents.TriggerConnectionError("Authentication failed - bridge missing");
+            yield break;
+        }
         float elapsed = 0f;
 
         while (!JSBridge.HasAuthToken && elapsed < AUTH_TOKEN_TIMEOUT)
@@ -171,7 +175,7 @@ public class SocketBackendService : IBackendService
         _socket.On<Error>(SocketIOEventTypes.Error, OnError);
         _socket.On<string>("game:init", OnGameInit);
         _socket.On<string>("result", OnResult);
-        _socket.On<string>("pong", OnPongReceived);
+        _socket.On("pong", OnPongReceived);
         _socket.On<string>("internalError", OnInternalError);
         _socket.On<string>("alert", OnAlert);
         _socket.On<string>("AnotherDevice", OnAnotherDevice);
@@ -225,13 +229,13 @@ public class SocketBackendService : IBackendService
             Debug.LogWarning("Session expired detected");
             OnDisconnected();
       #if UNITY_WEBGL && !UNITY_EDITOR
-              JSBridge.SendMessage("session_expired");
+              JSBridge.SendPostMessageToPlatform("session_expired");
       #endif
           }
           else
           {
       #if UNITY_WEBGL && !UNITY_EDITOR
-              JSBridge.SendMessage("error");
+              JSBridge.SendPostMessageToPlatform("error");
       #endif
           }
     }
@@ -269,7 +273,7 @@ public class SocketBackendService : IBackendService
         }
     }
 
-    private void OnPongReceived(string data)
+    private void OnPongReceived()
     {
       //  Debug.Log($"[Socket] Pong received - Latency: {(Time.time - _lastPongTime) * 1000:F0}ms");
         _waitingForPong = false;
