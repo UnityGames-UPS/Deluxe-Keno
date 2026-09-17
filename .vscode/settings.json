@@ -66,5 +66,6 @@
     "explorer.fileNesting.patterns": {
         "*.sln": "*.csproj",
         "*.slnx": "*.csproj"
-    }
+    },
+    "dotnet.defaultSolution": "Deluxe-Keno.slnx"
 }
