@@ -3,12 +3,12 @@ using System.Collections.Generic;
 /// <summary>
 /// Generic list pool to reduce GC allocations
 /// </summary>
-public static class ListPool<T>
+internal static class ListPool<T>
 {
     private static readonly Stack<List<T>> _pool = new Stack<List<T>>();
     private const int MAX_POOL_SIZE = 20;
 
-    public static List<T> Get()
+    internal static List<T> Get()
     {
         if (_pool.Count > 0)
         {
@@ -19,7 +19,7 @@ public static class ListPool<T>
         return new List<T>();
     }
 
-    public static void Release(List<T> list)
+    private static void Release(List<T> list)
     {
         if (list == null) return;
         list.Clear();

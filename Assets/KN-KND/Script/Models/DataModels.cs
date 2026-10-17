@@ -48,28 +48,28 @@ public class GameState
     public int totalAutoRounds;
 }
 
-public static class GameConfig
+internal static class GameConfig
 {
-    public const int MIN_NUMBERS = 1;
-    public const int MAX_NUMBERS = 15;
-    public const int TOTAL_NUMBERS = 80;
-    public const int DRAWS_PER_GAME = 20;
+    internal const int MIN_NUMBERS = 1;
+    internal const int MAX_NUMBERS = 15;
+    private const int TOTAL_NUMBERS = 80;
+    private const int DRAWS_PER_GAME = 20;
 
-    public const float NORMAL_BALL_DELAY = 0.4f;
-    public const float TURBO_BALL_DELAY = 0.1f;
-    public const float INSTANT_BALL_DELAY = 0.0f;
+    internal const float NORMAL_BALL_DELAY = 0.4f;
+    internal const float TURBO_BALL_DELAY = 0.1f;
+    internal const float INSTANT_BALL_DELAY = 0.0f;
 
-    public const float BALL_ANIMATION_DURATION = 0.5f;
-    public const float BUTTON_SCALE_DURATION = 0.15f;
-    public const float BUTTON_SCALE_AMOUNT = 1.1f;
+    private const float BALL_ANIMATION_DURATION = 0.5f;
+    internal const float BUTTON_SCALE_DURATION = 0.15f;
+    internal const float BUTTON_SCALE_AMOUNT = 1.1f;
 }
 
-public class PaytableEntry
+internal class PaytableEntry
 {
-    public int hits;
-    public float multiplier;
+    private int hits;
+    private float multiplier;
 
-    public PaytableEntry(int hits, float multiplier)
+    private PaytableEntry(int hits, float multiplier)
     {
         this.hits = hits;
         this.multiplier = multiplier;

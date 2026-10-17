@@ -7,7 +7,7 @@ using UnityEngine;
 /// Backend service interface
 /// </summary>
 /// test push
-public interface IBackendService
+internal interface IBackendService
 {
     void Initialize(Action<GameInitData> onInitialized);
     void SendDrawRequest(float bet, List<int> picks, Action<GameResultData> onResult);
@@ -19,7 +19,7 @@ public interface IBackendService
 /// <summary>
 /// Dummy backend for testing (unchanged)
 /// </summary>
-public class DummyBackendService : IBackendService
+internal class DummyBackendService : IBackendService
 {
     private GameInitData _initData;
     private float _balance = 999.789f ;
@@ -133,7 +133,7 @@ public class CoroutineRunner : MonoBehaviour
     private static CoroutineRunner _instance;
     private static bool _isQuitting = false;
 
-    public static bool IsQuitting => _isQuitting;
+    internal static bool IsQuitting => _isQuitting;
 
     private void OnApplicationQuit()
     {
@@ -145,7 +145,7 @@ public class CoroutineRunner : MonoBehaviour
         _isQuitting = true;
     }
 
-    public static CoroutineRunner Instance
+    internal static CoroutineRunner Instance
     {
         get
         {

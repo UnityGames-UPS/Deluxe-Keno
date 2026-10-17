@@ -3,11 +3,11 @@ using System.Collections.Generic;
 using UnityEngine;
 using Newtonsoft.Json;
 
-public class SocketEventHandler
+internal class SocketEventHandler
 {
     private float[] _availableBets;
 
-    public GameInitData ParseInitData(string json)
+    internal GameInitData ParseInitData(string json)
     {
         try
         {
@@ -53,7 +53,7 @@ public class SocketEventHandler
         }
     }
 
-    public GameResultData ParseResultData(string json)
+    internal GameResultData ParseResultData(string json)
     {
         try
         {
@@ -96,7 +96,7 @@ public class SocketEventHandler
         }
     }
 
-    public int GetBetIndex(float betAmount)
+    internal int GetBetIndex(float betAmount)
     {
         if (_availableBets == null || _availableBets.Length == 0)
         {

@@ -127,7 +127,7 @@ public class IntroAnimationController : MonoBehaviour
         PlayIntro();
     }
 
-    public void PlayIntro()
+    private void PlayIntro()
     {
         if (_isPlaying) return;
 
@@ -212,7 +212,7 @@ public class IntroAnimationController : MonoBehaviour
         }
     }
 
-    public void ResetAndPlayIntro()
+    private void ResetAndPlayIntro()
     {
         _hasPlayedOnce = false;
 

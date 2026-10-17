@@ -11,7 +11,7 @@ public class MainMenuController : MonoBehaviour
 {
     #region Singleton
     private static MainMenuController _instance;
-    public static MainMenuController Instance
+    private static MainMenuController Instance
     {
         get
         {
@@ -534,12 +534,12 @@ public class MainMenuController : MonoBehaviour
     /// <summary>
     /// Check if menu is currently open
     /// </summary>
-    public bool IsMenuOpen => _isMenuOpen;
+    private bool IsMenuOpen => _isMenuOpen;
 
     /// <summary>
     /// Programmatically close menu (useful for external systems)
     /// </summary>
-    public void ForceCloseMenu()
+    private void ForceCloseMenu()
     {
         if (_isMenuOpen)
             CloseMenu();

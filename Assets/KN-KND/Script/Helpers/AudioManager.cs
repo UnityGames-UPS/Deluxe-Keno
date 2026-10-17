@@ -42,10 +42,10 @@ public class AudioManager : MonoBehaviour
     private float _sfxVolume = 1f;
     private float _musicVolume = 0.5f;
 
-    public bool SFXEnabled => _sfxEnabled;
-    public bool MusicEnabled => _musicEnabled;
-    public float SFXVolume => _sfxVolume;
-    public float MusicVolume => _musicVolume;
+    internal bool SFXEnabled => _sfxEnabled;
+    internal bool MusicEnabled => _musicEnabled;
+    private float SFXVolume => _sfxVolume;
+    private float MusicVolume => _musicVolume;
     #endregion
 
     #region Object Pool
@@ -168,7 +168,7 @@ public class AudioManager : MonoBehaviour
     }
 
     #region Public Audio Controls
-    public void PlayBackgroundMusic()
+    internal void PlayBackgroundMusic()
     {
         if (_isBeingDestroyed || _bgMusicSource == null || !_musicEnabled || _mainBGMusic == null) return;
 
@@ -185,7 +185,7 @@ public class AudioManager : MonoBehaviour
         Debug.Log("[AudioManager] Background music started");
     }
 
-    public void StopBackgroundMusic()
+    private void StopBackgroundMusic()
     {
         if (_isBeingDestroyed || _bgMusicSource == null) return;
         try
@@ -199,18 +199,18 @@ public class AudioManager : MonoBehaviour
         catch (MissingReferenceException) { }
     }
 
-    public void PlayBallFalling() => PlaySFX(_ballFallingSound);
-    public void PlayError() => PlaySFX(_errorSound);
-    public void PlayGameStart() => PlaySFX(_gameStartSound);
-    public void PlayNormalSpeedClick() => PlaySFX(_normalSpeedClickSound);
-    public void PlayTurboSpeedClick() => PlaySFX(_turboSpeedClickSound);
-    public void PlayInstantSpeedClick() => PlaySFX(_instantSpeedClickSound);
-    public void PlayButtonClick() => PlaySFX(_buttonClickSound);
-    public void PlayPlayButton() => PlaySFX(_playButtonSound);
-    public void PlayWinBall() => PlaySFX(_winBallSound);
-    public void PlayWinPopup() => PlaySFX(_winPopupSound);
-    public void PlayScrollButton() => PlaySFX(_scrollButtonSound);
-    public void PlayScrollDrag() => PlaySFX(_scrollDragSound);
+    internal void PlayBallFalling() => PlaySFX(_ballFallingSound);
+    internal void PlayError() => PlaySFX(_errorSound);
+    internal void PlayGameStart() => PlaySFX(_gameStartSound);
+    internal void PlayNormalSpeedClick() => PlaySFX(_normalSpeedClickSound);
+    internal void PlayTurboSpeedClick() => PlaySFX(_turboSpeedClickSound);
+    internal void PlayInstantSpeedClick() => PlaySFX(_instantSpeedClickSound);
+    internal void PlayButtonClick() => PlaySFX(_buttonClickSound);
+    internal void PlayPlayButton() => PlaySFX(_playButtonSound);
+    internal void PlayWinBall() => PlaySFX(_winBallSound);
+    internal void PlayWinPopup() => PlaySFX(_winPopupSound);
+    private void PlayScrollButton() => PlaySFX(_scrollButtonSound);
+    internal void PlayScrollDrag() => PlaySFX(_scrollDragSound);
 
     private void PlaySFX(AudioClip clip)
     {
@@ -254,7 +254,7 @@ public class AudioManager : MonoBehaviour
     #endregion
 
     #region Settings Controls
-    public void ToggleSFX()
+    internal void ToggleSFX()
     {
         _isForceMuted = false;
         _sfxEnabled = !_sfxEnabled;
@@ -262,7 +262,7 @@ public class AudioManager : MonoBehaviour
         GameEvents.TriggerAudioSettingsChanged();
     }
 
-    public void ToggleMusic()
+    internal void ToggleMusic()
     {
         _isForceMuted = false;
         _musicEnabled = !_musicEnabled;
@@ -271,7 +271,7 @@ public class AudioManager : MonoBehaviour
         GameEvents.TriggerAudioSettingsChanged();
     }
 
-    public void SetSFXVolume(float volume)
+    private void SetSFXVolume(float volume)
     {
         _isForceMuted = false;
         _sfxVolume = Mathf.Clamp01(volume);
@@ -280,7 +280,7 @@ public class AudioManager : MonoBehaviour
         SaveSettings();
     }
 
-    public void SetMusicVolume(float volume)
+    private void SetMusicVolume(float volume)
     {
         _isForceMuted = false;
         _musicVolume = Mathf.Clamp01(volume);

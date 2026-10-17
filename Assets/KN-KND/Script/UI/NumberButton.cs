@@ -32,7 +32,7 @@ public class NumberButton : MonoBehaviour
     // OPTIMIZATION: Cache number string to avoid ToString() calls
     private string _numberString;
 
-    public int Number => _number;
+    private int Number => _number;
 
     private void Awake()
     {
@@ -53,7 +53,7 @@ public class NumberButton : MonoBehaviour
         transform.DOKill(true);
     }
 
-    public void Initialize(int number)
+    internal void Initialize(int number)
     {
         _number = number;
         _numberString = number.ToString(); // Cache string
@@ -102,13 +102,13 @@ public class NumberButton : MonoBehaviour
         AudioManager.Instance.PlayButtonClick();
     }
 
-    public void Select()
+    internal void Select()
     {
         _isSelected = true;
         UpdateVisualState();
     }
 
-    public void Deselect()
+    internal void Deselect()
     {
         transform.DOKill(true);
         _isSelected = false;
@@ -117,21 +117,21 @@ public class NumberButton : MonoBehaviour
         UpdateVisualState();
     }
 
-    public void ClearDrawnState()
+    internal void ClearDrawnState()
     {
         _isDrawn = false;
         _isWinning = false;
         UpdateVisualState();
     }
 
-    public void MarkAsDrawn()
+    internal void MarkAsDrawn()
     {
         _isDrawn = true;
         UpdateVisualState();
         AnimateDrawn();
     }
 
-    public void MarkAsWinning()
+    internal void MarkAsWinning()
     {
         _isWinning = true;
         _isDrawn = true;
@@ -139,7 +139,7 @@ public class NumberButton : MonoBehaviour
         AnimateWin();
     }
 
-    public void ResetState()
+    internal void ResetState()
     {
         transform.DOKill(true);
         _isSelected = false;
@@ -213,7 +213,7 @@ public class NumberButton : MonoBehaviour
         winSeq.OnComplete(() => winSeq.Kill());
     }
 
-    public void SetInteractable(bool interactable)
+    internal void SetInteractable(bool interactable)
     {
         _button.interactable = interactable;
     }

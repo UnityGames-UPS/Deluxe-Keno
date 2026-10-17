@@ -30,8 +30,8 @@ public class GameController : MonoBehaviour
     #endregion
 
     #region Public Accessors & WebGL Receivers
-    public GameModel GetModel() => _model;
-    public bool IsInitialized => _isInitialized;
+    internal GameModel GetModel() => _model;
+    private bool IsInitialized => _isInitialized;
 
     /// <summary>
     /// WebGL Platform receiver for SendMessage("SocketManager", "ReceiveAuthToken", jsonData)
@@ -167,7 +167,7 @@ public class GameController : MonoBehaviour
         HandleFocusChange(focused);
     }
 
-    public void HandleFocusChange(bool focus)
+    internal void HandleFocusChange(bool focus)
     {
         Debug.Log($"[GameController] HandleFocusChange - focus: {focus}");
         _hasFocus = focus;
@@ -241,7 +241,7 @@ public class GameController : MonoBehaviour
     }
 
 
-    public void CloseSocket()
+    internal void CloseSocket()
     {
         StartCoroutine(CloseSocketCoroutine());
     }

@@ -5,7 +5,7 @@ using UnityEngine;
 using Best.SocketIO;
 using Best.SocketIO.Events;
 
-public class SocketBackendService : IBackendService
+internal class SocketBackendService : IBackendService
 {
     private const float PING_INTERVAL = 2f;
     private const int MAX_MISSED_PONGS = 15;
@@ -41,7 +41,7 @@ public class SocketBackendService : IBackendService
 
     public bool IsConnected => _isConnected && _socket != null && _socket.IsOpen;
 
-    public SocketBackendService(string serverURL, string nameSpace, string gameID, string editorToken)
+    internal SocketBackendService(string serverURL, string nameSpace, string gameID, string editorToken)
     {
         _serverURL = serverURL;
         _namespace = nameSpace;

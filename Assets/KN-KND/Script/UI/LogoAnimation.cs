@@ -4,11 +4,11 @@ using UnityEngine.UI;
 public class LogoAnimation : MonoBehaviour
 {
     [Header("Sprites")]
-    public Sprite[] logoFrames;   // 28 sprites in correct order
+    [SerializeField] private Sprite[] logoFrames;   // 28 sprites in correct order
 
     [Header("Animation Settings")]
-    public float frameRate = 0.05f;   // Time between frames
-    public float holdTime = 5f;        // Hold last frame in seconds
+    [SerializeField] private float frameRate = 0.05f;   // Time between frames
+    [SerializeField] private float holdTime = 5f;        // Hold last frame in seconds
 
     private Image image;
 

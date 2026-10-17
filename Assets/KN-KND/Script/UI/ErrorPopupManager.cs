@@ -7,7 +7,7 @@ public class ErrorPopupManager : MonoBehaviour
 {
     private static ErrorPopupManager _instance;
 
-    public static ErrorPopupManager Instance
+    private static ErrorPopupManager Instance
     {
         get
         {
@@ -59,7 +59,7 @@ public class ErrorPopupManager : MonoBehaviour
             _errorPopupArea.transform.DOKill(true);
     }
 
-    public static void ShowError(string errorMessage)
+    internal static void ShowError(string errorMessage)
     {
         if (Instance != null)
             Instance.DisplayError(errorMessage);
@@ -140,14 +140,14 @@ public class ErrorPopupManager : MonoBehaviour
     }
 }
 
-public static class ErrorMessages
+internal static class ErrorMessages
 {
-    public const string NO_NUMBERS_SELECTED = "Please select at least one number to play";
-    public const string INSUFFICIENT_BALANCE = "Insufficient balance to place bet";
-    public const string TOO_MANY_NUMBERS = "Maximum 15 numbers can be selected";
-    public const string GAME_IN_PROGRESS = "Please wait for current game to finish";
-    public const string CONNECTION_LOST = "Connection lost. Attempting to reconnect...";
-    public const string SERVER_ERROR = "Server error occurred. Please try again";
-    public const string INVALID_BET = "Please select a valid bet amount";
-    public const string AUTOPLAY_NO_ROUNDS = "Please select number of rounds for auto-play";
+    internal const string NO_NUMBERS_SELECTED = "Please select at least one number to play";
+    internal const string INSUFFICIENT_BALANCE = "Insufficient balance to place bet";
+    internal const string TOO_MANY_NUMBERS = "Maximum 15 numbers can be selected";
+    internal const string GAME_IN_PROGRESS = "Please wait for current game to finish";
+    internal const string CONNECTION_LOST = "Connection lost. Attempting to reconnect...";
+    internal const string SERVER_ERROR = "Server error occurred. Please try again";
+    internal const string INVALID_BET = "Please select a valid bet amount";
+    internal const string AUTOPLAY_NO_ROUNDS = "Please select number of rounds for auto-play";
 }
